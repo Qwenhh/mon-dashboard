@@ -1,61 +1,82 @@
 // api/articles.js — Récupération et parsing des flux RSS
-// Vercel met en cache la réponse 3 min (s-maxage=180)
-
 const Parser = require('rss-parser');
 
 const parser = new Parser({
-  timeout: 10000,
-  headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MonDashboard/1.0)' },
-  customFields: { item: [['content:encoded', 'contentFull']] },
+  timeout: 12000,
+  headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MonDashboard/1.0; RSS Reader)' },
+  customFields: { item: [['content:encoded', 'contentFull'], 'category'] },
 });
 
-// ── Sources RSS ──────────────────────────────────────────────
+// ── Sources RSS avec URLs alternatives (fallback) ─────────────
 const SOURCES = [
   {
     id: 'vdm',
-    url: 'https://www.viedemerde.fr/rss',
+    urls: [
+      'https://www.viedemerde.fr/rss',
+      'https://www.viedemerde.fr/feed',
+    ],
     category: 'fun',
     label: 'VDM',
     limit: 15,
   },
   {
     id: 'dtc',
-    url: 'https://danstonchat.com/feeds/',
+    urls: [
+      'https://danstonchat.com/feeds/',
+      'https://danstonchat.com/rss',
+      'https://danstonchat.com/feed',
+    ],
     category: 'fun',
     label: 'DTC',
     limit: 15,
   },
   {
     id: 'f1',
-    url: 'https://www.lequipe.fr/rss/actu-hebdo_Formule-1.xml',
+    urls: [
+      'https://www.lequipe.fr/rss/actu-hebdo_Formule-1.xml',
+      'https://www.lequipe.fr/Xml/Formule1/Titres/actu_rss.xml',
+      'https://www.lequipe.fr/Xml/actu_rss_Formule-1.xml',
+    ],
     category: 'f1',
     label: 'leq',
     limit: 20,
   },
   {
     id: 'biathlon',
-    url: 'https://www.lequipe.fr/rss/actu-hebdo_Biathlon.xml',
+    urls: [
+      'https://www.lequipe.fr/rss/actu-hebdo_Biathlon.xml',
+      'https://www.lequipe.fr/Xml/Biathlon/Titres/actu_rss.xml',
+      'https://www.lequipe.fr/Xml/actu_rss_Biathlon.xml',
+    ],
     category: 'biathlon',
     label: 'leq',
     limit: 20,
   },
   {
     id: 'foot-leq',
-    url: 'https://www.lequipe.fr/rss/actu-hebdo_Football.xml',
+    urls: [
+      'https://www.lequipe.fr/rss/actu-hebdo_Football.xml',
+      'https://www.lequipe.fr/Xml/Football/Titres/actu_rss.xml',
+      'https://www.lequipe.fr/Xml/actu_rss_Football.xml',
+    ],
     category: 'foot',
     label: 'leq',
     limit: 15,
   },
   {
     id: 'foot-fm',
-    url: 'https://www.footmercato.net/club/fc-barcelone/rss',
+    urls: [
+      'https://www.footmercato.net/club/fc-barcelone/rss',
+      'https://www.footmercato.net/club/rss-fc-barcelone/',
+      'https://www.footmercato.net/flux-rss/club/fc-barcelone',
+    ],
     category: 'foot',
     label: 'fm',
     limit: 15,
   },
 ];
 
-// ── Filtrer les articles réservés aux abonnés L'Équipe ───────
+// ── Filtre articles abonnés L'Équipe ──────────────────────────
 function isPremium(item) {
   const title = (item.title || '').toLowerCase();
   const cats = (item.categories || []).map((c) => String(c).toLowerCase());
@@ -67,49 +88,39 @@ function isPremium(item) {
   );
 }
 
-// ── ID stable basé sur l'URL de l'article ────────────────────
+// ── ID stable ─────────────────────────────────────────────────
 function makeId(str) {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i);
-    hash |= 0;
-  }
-  return Math.abs(hash).toString(36);
+  let h = 0;
+  for (let i = 0; i < str.length; i++) { h = (h << 5) - h + str.charCodeAt(i); h |= 0; }
+  return Math.abs(h).toString(36);
 }
 
-// ── Nettoyage du HTML des flux RSS ───────────────────────────
+// ── Nettoyage HTML ────────────────────────────────────────────
 function strip(html) {
   return (html || '')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ').trim();
 }
 
-// ── Handler principal ─────────────────────────────────────────
-module.exports = async function handler(req, res) {
-  // Cache Vercel Edge : 3 min (sport), revalidation silencieuse
-  res.setHeader('Cache-Control', 's-maxage=180, stale-while-revalidate=60');
-
-  const results = await Promise.allSettled(
-    SOURCES.map(async (src) => {
-      const feed = await parser.parseURL(src.url);
+// ── Essaie chaque URL jusqu'à ce qu'une fonctionne ───────────
+async function fetchSource(src) {
+  let lastError;
+  for (const url of src.urls) {
+    try {
+      const feed = await parser.parseURL(url);
+      console.log(`✓ ${src.id} → ${url} (${feed.items.length} items)`);
       return {
         category: src.category,
         items: feed.items
           .filter((item) => !isPremium(item))
           .slice(0, src.limit)
           .map((item) => ({
-            id: makeId(item.link || item.guid || item.title || Math.random().toString()),
+            id: makeId(item.link || item.guid || item.title || String(Math.random())),
             title: strip(item.title || ''),
             link: item.link || '',
             date: item.isoDate || item.pubDate || new Date().toISOString(),
-            // Pour VDM/DTC : le contenu complet est souvent dans contentFull
             content: strip(
               item.contentFull || item.contentSnippet || item.content || item.summary || ''
             ).slice(0, 800),
@@ -118,8 +129,19 @@ module.exports = async function handler(req, res) {
             category: src.category,
           })),
       };
-    })
-  );
+    } catch (e) {
+      console.warn(`✗ ${src.id} → ${url}: ${e.message}`);
+      lastError = e;
+    }
+  }
+  throw lastError || new Error(`Toutes les URLs ont échoué pour ${src.id}`);
+}
+
+// ── Handler ───────────────────────────────────────────────────
+module.exports = async function handler(req, res) {
+  res.setHeader('Cache-Control', 's-maxage=180, stale-while-revalidate=60');
+
+  const results = await Promise.allSettled(SOURCES.map(fetchSource));
 
   const byCategory = {};
   for (const r of results) {
@@ -132,10 +154,14 @@ module.exports = async function handler(req, res) {
     byCategory[category].push(...items);
   }
 
-  // Tri par date décroissante dans chaque catégorie
   for (const cat of Object.keys(byCategory)) {
     byCategory[cat].sort((a, b) => new Date(b.date) - new Date(a.date));
   }
+
+  // Toujours renvoyer toutes les catégories même vides
+  ['fun', 'f1', 'biathlon', 'foot'].forEach(cat => {
+    if (!byCategory[cat]) byCategory[cat] = [];
+  });
 
   res.status(200).json(byCategory);
 };
