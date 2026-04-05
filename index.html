@@ -531,29 +531,30 @@ async function loadF1GP() {
 }
 
 /* ══ ÉQUIPES — TheSportsDB ══ */
+// IDs directs TheSportsDB (évite les erreurs de recherche par nom)
 const TEAMS=[
-  {searchName:'AS Monaco',  displayName:'AS Monaco',     id:'team-monaco'},
-  {searchName:'FC Barcelona',displayName:'FC Barcelone', id:'team-barce'},
-  {searchName:'Stade de Reims',displayName:'Stade de Reims',id:'team-reims'},
+  {teamId:'133823', displayName:'AS Monaco',      id:'team-monaco'},
+  {teamId:'133739', displayName:'FC Barcelone',   id:'team-barce'},
+  {teamId:'133934', displayName:'Stade de Reims', id:'team-reims'},
 ];
 function frDate(d,t){ if(!d)return''; const dt=new Date(d+(t?'T'+t:'T12:00:00')); return dt.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'})+(t&&t!=='00:00:00'?' · '+dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Paris'}):''); }
-async function loadTeam({searchName,displayName,id}){
+async function loadTeam({teamId,displayName,id}){
   const el=document.getElementById(id);
   try{
-    const s=await(await fetch(`https://www.thesportsdb.com/api/v1/json/3/searchteams.php?t=${encodeURIComponent(searchName)}`)).json();
-    const team=(s.teams||[]).find(t=>t.strSport==='Soccer')||s.teams?.[0];
-    if(!team)throw new Error('not found');
-    const [lR,nR]=await Promise.all([
-      fetch(`https://www.thesportsdb.com/api/v1/json/3/eventslast.php?id=${team.idTeam}`),
-      fetch(`https://www.thesportsdb.com/api/v1/json/3/eventsnext.php?id=${team.idTeam}`)
+    const [lR,nR,tR]=await Promise.all([
+      fetch(`https://www.thesportsdb.com/api/v1/json/3/eventslast.php?id=${teamId}`,{signal:AbortSignal.timeout(8000)}),
+      fetch(`https://www.thesportsdb.com/api/v1/json/3/eventsnext.php?id=${teamId}`,{signal:AbortSignal.timeout(8000)}),
+      fetch(`https://www.thesportsdb.com/api/v1/json/3/lookupteam.php?id=${teamId}`,{signal:AbortSignal.timeout(6000)}),
     ]);
-    const lastD=await lR.json(), nextD=await nR.json();
+    const lastD=await lR.json(), nextD=await nR.json(), teamD=await tR.json();
     const last=(lastD.results||[]).slice(-1)[0], next=(nextD.events||[])[0];
-    const badge=team.strTeamBadge?`<img class="team-badge" src="${team.strTeamBadge}/tiny" alt="" onerror="this.style.display='none'">`:`<span style="font-size:1.3rem">⚽</span>`;
+    const teamName=(teamD.teams||[])[0]?.strTeam||displayName;
+    const badgeUrl=(teamD.teams||[])[0]?.strTeamBadge;
+    const badge=badgeUrl?`<img class="team-badge" src="${badgeUrl}/tiny" alt="" onerror="this.style.display='none'">`:`<span style="font-size:1.3rem">⚽</span>`;
     let html=`<div class="team-header">${badge}<span class="team-name">${displayName}</span></div>`;
     if(last){
       const hs=parseInt(last.intHomeScore),as=parseInt(last.intAwayScore);
-      const isHome=last.strHomeTeam===team.strTeam;
+      const isHome=last.strHomeTeam===teamName;
       const opp=isHome?last.strAwayTeam:last.strHomeTeam;
       const mySc=isHome?hs:as,oppSc=isHome?as:hs;
       const r=mySc>oppSc?'V':mySc<oppSc?'D':'N';
@@ -563,14 +564,15 @@ async function loadTeam({searchName,displayName,id}){
       </div></div>`;
     }
     if(next){
-      const isHome=next.strHomeTeam===team.strTeam;
+      const isHome=next.strHomeTeam===teamName;
       html+=`<div class="team-section"><div class="team-section-label">Prochain match</div><div class="team-match">
         <div class="team-match-teams">${isHome?'🏠 ':'🔀 '}vs ${isHome?next.strAwayTeam:next.strHomeTeam}</div>
         <div class="team-match-info"><span class="comp-text">${frDate(next.dateEvent,next.strTime)}</span></div>
       </div></div>`;
     }
+    if(!last&&!next) html+=`<div class="widget-sub">Aucun match trouvé</div>`;
     el.innerHTML=html;
-  }catch{
+  }catch(e){
     el.innerHTML=`<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${displayName}</span></div><div class="widget-sub">Données indisponibles</div>`;
   }
 }
@@ -584,8 +586,8 @@ Promise.allSettled([fetchReadStatus(), loadArticles()]).then(renderAll);
 Promise.allSettled([
   loadWeather(),
   loadBitcoin(),
-  loadFinance('IWDA.AS',       'IE0002XZSHO1', 'widget-msci', '📈 MSCI World', '€'),
-  loadFinance('0P0001AZEM.F',  'FR0011053636', 'widget-capb', '📊 Capital B',  '€'),
+  loadFinance('WPEA.PA',       'IE0002XZSHO1', 'widget-msci', '📈 MSCI World PEA', '€'),
+  loadFinance('ALCPB.PA',      'FR0011053636', 'widget-capb', '📊 Capital B',  '€'),
   loadF1GP(),
   ...TEAMS.map(t=>loadTeam(t)),
 ]);
