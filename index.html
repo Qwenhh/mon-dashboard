@@ -540,7 +540,7 @@ function frDate(iso){ if(!iso)return''; const dt=new Date(iso); return dt.toLoca
 async function loadTeam({espnId,league,displayName,id}){
   const el=document.getElementById(id);
   try{
-    const r=await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/teams/${espnId}/schedule`,{signal:AbortSignal.timeout(8000)});
+    const r=await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/teams/${espnId}/schedule?season=2025`,{signal:AbortSignal.timeout(8000)});
     const data=await r.json();
     const events=data.events||[];
     const now=new Date();
