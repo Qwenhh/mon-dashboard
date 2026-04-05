@@ -1,216 +1,608 @@
-// api/articles.js — Récupération et parsing des flux RSS
-const Parser = require('rss-parser');
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mon Dashboard</title>
+  <style>
+    :root {
+      --bg: #0f0f13; --surface: #1a1a24; --surface2: #22222f; --border: #2e2e3e;
+      --text: #e8e8f0; --muted: #6a6a85;
+      --accent-fun: #c25e9a; --accent-f1: #e8322b; --accent-biat: #1f8ccd;
+      --accent-foot: #27ae60; --accent-home: #7b6cf6;
+      --accent-vdm: #e04a6d; --accent-dtc: #9b6fd4;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
 
-const parser = new Parser({
-  timeout: 12000,
-  headers: {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-    'Accept': 'application/rss+xml, application/xml, text/xml, */*',
-    'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
-    'Cache-Control': 'no-cache',
-  },
-  customFields: { item: [['content:encoded', 'contentFull'], 'category'] },
+    /* NAV */
+    nav { background: var(--surface); border-bottom: 1px solid var(--border); display: flex; align-items: stretch; padding: 0 16px; gap: 4px; position: sticky; top: 0; z-index: 100; overflow-x: auto; scrollbar-width: none; }
+    nav::-webkit-scrollbar { display: none; }
+    .nav-logo { font-weight: 800; font-size: 0.95rem; color: var(--text); padding: 14px 12px 14px 0; margin-right: 8px; white-space: nowrap; flex-shrink: 0; }
+    .tab { display: flex; align-items: center; gap: 6px; padding: 0 14px; cursor: pointer; border: none; background: none; color: var(--muted); font-size: 0.82rem; font-weight: 600; white-space: nowrap; border-bottom: 3px solid transparent; transition: color .15s, border-color .15s; min-height: 48px; flex-shrink: 0; }
+    .tab:hover { color: var(--text); }
+    .tab.active { color: var(--text); }
+    .tab[data-tab="home"].active     { border-bottom-color: var(--accent-home); }
+    .tab[data-tab="fun"].active      { border-bottom-color: var(--accent-fun); }
+    .tab[data-tab="f1"].active       { border-bottom-color: var(--accent-f1); }
+    .tab[data-tab="biathlon"].active { border-bottom-color: var(--accent-biat); }
+    .tab[data-tab="foot"].active     { border-bottom-color: var(--accent-foot); }
+    .tab-badge { background: var(--surface2); color: var(--muted); font-size: .65rem; padding: 1px 6px; border-radius: 20px; font-weight: 700; min-width: 18px; text-align: center; }
+    .tab.active .tab-badge { background: rgba(255,255,255,.08); color: var(--text); }
+
+    /* PAGES */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* HOME */
+    .home-content { max-width: 1200px; margin: 0 auto; padding: 16px; }
+    .section-divider { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); display: flex; align-items: center; gap: 10px; margin: 22px 0 10px; }
+    .section-divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+    .section-divider:first-child { margin-top: 4px; }
+
+    /* WIDGETS */
+    .widgets-row { display: grid; grid-template-columns: repeat(4,1fr); gap: 10px; }
+    @media (max-width:800px) { .widgets-row { grid-template-columns: repeat(2,1fr); } }
+    .widget-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; min-height: 88px; position: relative; overflow: hidden; }
+    .widget-label { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; color: var(--muted); margin-bottom: 6px; }
+    .widget-main { font-size: 1.5rem; font-weight: 800; line-height: 1; color: var(--text); }
+    .widget-sub { font-size: .75rem; color: var(--muted); margin-top: 4px; }
+    .widget-change { font-size: .75rem; font-weight: 600; margin-top: 4px; }
+    .widget-change.up { color: #27ae60; } .widget-change.down { color: #e04a6d; }
+    .widget-icon { position: absolute; top: 12px; right: 14px; font-size: 1.4rem; opacity: .5; }
+    .widget-link { font-size: .68rem; color: var(--muted); text-decoration: none; display: inline-block; margin-top: 6px; border-bottom: 1px dashed var(--border); }
+    .widget-link:hover { color: var(--text); }
+    .skeleton { background: linear-gradient(90deg, var(--surface2) 25%, var(--border) 50%, var(--surface2) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; height: 1em; }
+    @keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+    .skel-main { height: 1.8rem; width: 70%; margin-bottom: 6px; } .skel-sub { height: .75rem; width: 50%; }
+
+    /* F1 GP */
+    .gp-card { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent-f1); border-radius: 12px; padding: 16px 18px; }
+    .gp-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+    .gp-title { font-size: .95rem; font-weight: 700; }
+    .gp-round { font-size: .7rem; color: var(--muted); background: var(--surface2); padding: 3px 8px; border-radius: 20px; }
+    .gp-sessions { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px,1fr)); gap: 8px; }
+    .gp-session { background: var(--surface2); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+    .gp-session.next-up { border-color: var(--accent-f1); background: rgba(232,50,43,.08); }
+    .gp-session-name { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin-bottom: 4px; }
+    .gp-session.next-up .gp-session-name { color: var(--accent-f1); }
+    .gp-session-date { font-size: .78rem; font-weight: 600; }
+    .gp-session-time { font-size: .88rem; font-weight: 800; }
+    .gp-empty { color: var(--muted); font-size: .85rem; }
+
+    /* ÉQUIPES */
+    .teams-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+    @media (max-width:700px) { .teams-row { grid-template-columns: 1fr; } }
+    .team-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+    .team-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .team-badge { width: 28px; height: 28px; object-fit: contain; }
+    .team-name { font-size: .88rem; font-weight: 700; }
+    .team-section { margin-bottom: 10px; }
+    .team-section-label { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-bottom: 5px; }
+    .team-match { background: var(--surface2); border-radius: 8px; padding: 8px 10px; }
+    .team-match-teams { font-size: .8rem; font-weight: 600; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .team-match-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .team-match-date { font-size: .7rem; color: var(--muted); }
+    .result-badge { font-size: .65rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; }
+    .result-V { background: rgba(39,174,96,.2); color: #27ae60; }
+    .result-D { background: rgba(224,74,109,.2); color: #e04a6d; }
+    .result-N { background: rgba(255,193,7,.15); color: #f0c040; }
+    .score-text { font-size: .78rem; font-weight: 700; }
+    .comp-text  { font-size: .68rem; color: var(--muted); }
+
+    /* CATEGORY CARDS */
+    .category-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
+    @media (max-width:500px) { .category-grid { grid-template-columns: 1fr; } }
+    .home-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; cursor: pointer; transition: transform .15s, border-color .15s; position: relative; overflow: hidden; }
+    .home-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+    .home-card[data-goto="fun"]::before      { background: var(--accent-fun); }
+    .home-card[data-goto="f1"]::before       { background: var(--accent-f1); }
+    .home-card[data-goto="biathlon"]::before { background: var(--accent-biat); }
+    .home-card[data-goto="foot"]::before     { background: var(--accent-foot); }
+    .home-card:hover { transform: translateY(-2px); border-color: #3e3e55; }
+    .home-card-icon  { font-size: 1.5rem; margin-bottom: 8px; }
+    .home-card-title { font-size: .95rem; font-weight: 700; margin-bottom: 2px; }
+    .home-card-sub   { font-size: .75rem; color: var(--muted); margin-bottom: 12px; }
+    .home-card-count { font-size: 1.5rem; font-weight: 800; line-height: 1; }
+    .home-card[data-goto="fun"]      .home-card-count { color: var(--accent-fun); }
+    .home-card[data-goto="f1"]       .home-card-count { color: var(--accent-f1); }
+    .home-card[data-goto="biathlon"] .home-card-count { color: var(--accent-biat); }
+    .home-card[data-goto="foot"]     .home-card-count { color: var(--accent-foot); }
+    .home-card-label { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+    .home-preview { margin-top: 12px; border-top: 1px solid var(--border); padding-top: 10px; }
+    .home-preview-item { font-size: .73rem; color: var(--muted); padding: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .home-preview-item::before { content: '› '; }
+    .refresh-row { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 14px 0 4px; font-size: .72rem; color: var(--muted); }
+    .dot-live { width: 6px; height: 6px; background: #27ae60; border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+    /* ARTICLES */
+    .articles-page { max-width: 780px; margin: 0 auto; padding: 16px; }
+    .mark-all-row { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+    .btn-mark-all { background: none; border: 1px solid var(--border); color: var(--muted); font-size: .72rem; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: background .15s, color .15s; }
+    .btn-mark-all:hover { background: var(--surface2); color: var(--text); }
+    .article-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; display: flex; align-items: flex-start; cursor: pointer; transition: border-color .15s, background .15s; overflow: hidden; }
+    .article-card:hover { border-color: #3e3e55; background: var(--surface2); }
+    .article-card.read { opacity: .32; }
+    .article-card.read:hover { opacity: .5; }
+    .article-main { flex: 1; padding: 12px 14px; min-width: 0; }
+    .article-source-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+    .article-source-tag { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 2px 7px; border-radius: 20px; }
+    .tag-vdm { background: rgba(224,74,109,.15); color: var(--accent-vdm); }
+    .tag-dtc { background: rgba(155,111,212,.15); color: var(--accent-dtc); }
+    .tag-leq { background: rgba(232,50,43,.12); color: #e87070; }
+    .tag-fm  { background: rgba(39,174,96,.12); color: #5ec98a; }
+    .article-time { font-size: .68rem; color: var(--muted); }
+    .article-text { font-size: .875rem; line-height: 1.45; color: var(--text); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .fun-tab .article-text { -webkit-line-clamp: 3; }
+    .read-action { flex-shrink: 0; width: 48px; align-self: stretch; border-left: 1px solid var(--border); background: none; border-top: none; border-right: none; border-bottom: none; border-radius: 0; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s; }
+    .read-action:hover { background: rgba(39,174,96,.1); }
+    .read-action svg { width: 15px; height: 15px; stroke: var(--border); fill: none; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; transition: stroke .15s; }
+    .read-action:hover svg { stroke: #27ae60; }
+    .article-card.read .read-action svg { stroke: #27ae60; }
+    .loading-msg { padding: 30px; text-align: center; color: var(--muted); font-size: .85rem; }
+    .error-msg   { padding: 20px; text-align: center; color: #e04a6d; font-size: .82rem; }
+
+    /* MODAL */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.75); z-index: 999; align-items: center; justify-content: center; padding: 16px; backdrop-filter: blur(4px); }
+    .modal-overlay.open { display: flex; }
+    .modal { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; max-width: 600px; width: 100%; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; animation: slideUp .2s ease; }
+    @keyframes slideUp { from{transform:translateY(20px);opacity:0} to{transform:translateY(0);opacity:1} }
+    .modal-header { padding: 16px 18px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 10px; }
+    .modal-time { font-size: .72rem; color: var(--muted); flex: 1; }
+    .modal-close { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--border); background: none; color: var(--muted); font-size: 1rem; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: background .15s, color .15s; }
+    .modal-close:hover { background: var(--surface2); color: var(--text); }
+    .modal-body { padding: 20px 22px; overflow-y: auto; flex: 1; font-size: .95rem; line-height: 1.65; color: var(--text); }
+    .modal-footer { padding: 14px 18px; border-top: 1px solid var(--border); display: flex; gap: 10px; }
+    .btn-primary { flex: 1; padding: 10px; border-radius: 8px; border: none; font-size: .83rem; font-weight: 600; cursor: pointer; transition: opacity .15s; }
+    .btn-primary:hover { opacity: .85; }
+    .btn-read-modal { background: rgba(39,174,96,.15); color: #27ae60; border: 1px solid rgba(39,174,96,.3); }
+    .btn-read-modal.done { background: rgba(39,174,96,.25); }
+    .btn-open { background: var(--surface2); color: var(--text); border: 1px solid var(--border); text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 5px; }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">📰 Dashboard</div>
+  <button class="tab active" data-tab="home">🏠 Accueil</button>
+  <button class="tab" data-tab="fun">😂 Fun <span class="tab-badge" id="tbadge-fun">…</span></button>
+  <button class="tab" data-tab="f1">🏎️ F1 <span class="tab-badge" id="tbadge-f1">…</span></button>
+  <button class="tab" data-tab="biathlon">🎯 Biathlon <span class="tab-badge" id="tbadge-biathlon">…</span></button>
+  <button class="tab" data-tab="foot">⚽ Football <span class="tab-badge" id="tbadge-foot">…</span></button>
+</nav>
+
+<!-- ACCUEIL -->
+<div class="page active" id="page-home">
+  <div class="home-content">
+
+    <div class="section-divider">En direct</div>
+    <div class="widgets-row">
+      <div class="widget-card" id="widget-meteo"><div class="widget-label">🌍 Lille</div><div class="skeleton skel-main"></div><div class="skeleton skel-sub" style="margin-top:6px"></div></div>
+      <div class="widget-card" id="widget-btc"><div class="widget-label">₿ Bitcoin</div><div class="skeleton skel-main"></div><div class="skeleton skel-sub" style="margin-top:6px"></div></div>
+      <div class="widget-card" id="widget-msci"><div class="widget-label">📈 MSCI World</div><div class="skeleton skel-main"></div><div class="skeleton skel-sub" style="margin-top:6px"></div></div>
+      <div class="widget-card" id="widget-capb"><div class="widget-label">📊 Capital B</div><div class="skeleton skel-main"></div><div class="skeleton skel-sub" style="margin-top:6px"></div></div>
+    </div>
+
+    <div class="section-divider">Prochain GP · Formule 1</div>
+    <div class="gp-card" id="widget-gp"><div class="gp-empty">Chargement…</div></div>
+
+    <div class="section-divider">Mes équipes</div>
+    <div class="teams-row">
+      <div class="team-card" id="team-monaco"><div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">AS Monaco</span></div><div class="widget-sub">Chargement…</div></div>
+      <div class="team-card" id="team-barce"><div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">FC Barcelone</span></div><div class="widget-sub">Chargement…</div></div>
+      <div class="team-card" id="team-reims"><div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">Stade de Reims</span></div><div class="widget-sub">Chargement…</div></div>
+    </div>
+
+    <div class="section-divider">Articles à lire</div>
+    <div class="category-grid">
+      <div class="home-card" data-goto="fun"><div class="home-card-icon">😂</div><div class="home-card-title">Fun</div><div class="home-card-sub">VDM · Dans Ton Chat</div><div class="home-card-count" id="home-count-fun">…</div><div class="home-card-label">non lus</div><div class="home-preview" id="home-preview-fun"></div></div>
+      <div class="home-card" data-goto="f1"><div class="home-card-icon">🏎️</div><div class="home-card-title">Formule 1</div><div class="home-card-sub">L'Équipe</div><div class="home-card-count" id="home-count-f1">…</div><div class="home-card-label">non lus</div><div class="home-preview" id="home-preview-f1"></div></div>
+      <div class="home-card" data-goto="biathlon"><div class="home-card-icon">🎯</div><div class="home-card-title">Biathlon</div><div class="home-card-sub">L'Équipe</div><div class="home-card-count" id="home-count-biathlon">…</div><div class="home-card-label">non lus</div><div class="home-preview" id="home-preview-biathlon"></div></div>
+      <div class="home-card" data-goto="foot"><div class="home-card-icon">⚽</div><div class="home-card-title">Football</div><div class="home-card-sub">L'Équipe · Foot Mercato</div><div class="home-card-count" id="home-count-foot">…</div><div class="home-card-label">non lus</div><div class="home-preview" id="home-preview-foot"></div></div>
+    </div>
+
+    <div class="refresh-row"><div class="dot-live"></div>Mise à jour : <strong id="last-update">--:--</strong></div>
+  </div>
+</div>
+
+<!-- FUN -->
+<div class="page" id="page-fun">
+  <div class="articles-page fun-tab">
+    <div class="mark-all-row"><button class="btn-mark-all" onclick="markAllRead(['fun'])">Tout marquer comme lu</button></div>
+    <div id="list-fun"><div class="loading-msg">Chargement…</div></div>
+  </div>
+</div>
+
+<!-- F1 -->
+<div class="page" id="page-f1">
+  <div class="articles-page">
+    <div class="mark-all-row"><button class="btn-mark-all" onclick="markAllRead(['f1'])">Tout marquer comme lu</button></div>
+    <div id="list-f1"><div class="loading-msg">Chargement…</div></div>
+  </div>
+</div>
+
+<!-- BIATHLON -->
+<div class="page" id="page-biathlon">
+  <div class="articles-page">
+    <div class="mark-all-row"><button class="btn-mark-all" onclick="markAllRead(['biathlon'])">Tout marquer comme lu</button></div>
+    <div id="list-biathlon"><div class="loading-msg">Chargement…</div></div>
+  </div>
+</div>
+
+<!-- FOOT -->
+<div class="page" id="page-foot">
+  <div class="articles-page">
+    <div class="mark-all-row"><button class="btn-mark-all" onclick="markAllRead(['foot'])">Tout marquer comme lu</button></div>
+    <div id="list-foot"><div class="loading-msg">Chargement…</div></div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <span id="modal-tag" class="article-source-tag"></span>
+      <span id="modal-time" class="modal-time"></span>
+      <button class="modal-close" onclick="closeModalDirect()">✕</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn-primary btn-read-modal" id="modal-read-btn" onclick="modalToggleRead()">✓ Marquer comme lu</button>
+      <a class="btn-primary btn-open" id="modal-open-link" href="#" target="_blank">↗ Voir l'original</a>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══ STATE ══ */
+let articles = { fun:[], f1:[], biathlon:[], foot:[] };
+let readIds  = new Set();
+
+/* ══ TEMPS RELATIF ══ */
+function relTime(iso) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(diff/60000);
+  if (m < 1)  return 'à l\'instant';
+  if (m < 60) return `il y a ${m} min`;
+  const h = Math.floor(m/60);
+  if (h < 24) return `il y a ${h}h`;
+  return `il y a ${Math.floor(h/24)}j`;
+}
+
+/* ══ READ STATUS (Supabase via /api/read) ══ */
+async function fetchReadStatus() {
+  try {
+    const d = await fetch('/api/read').then(r=>r.json());
+    readIds = new Set(d.read || []);
+  } catch(e) {
+    console.warn('Statut lu indisponible:', e);
+  }
+}
+
+function syncRead(id, action) {
+  fetch('/api/read', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ articleId: id, action }),
+  }).catch(console.warn);
+}
+
+function toggleRead(cat, id, e) {
+  if (e) e.stopPropagation();
+  const wasRead = readIds.has(id);
+  if (wasRead) readIds.delete(id); else readIds.add(id);
+  syncRead(id, wasRead ? 'unmark' : 'mark');
+  renderAll();
+  if (modalState.id === id) syncModalReadBtn();
+}
+
+function markAllRead(cats) {
+  cats.forEach(cat => {
+    (articles[cat] || []).forEach(a => {
+      if (!readIds.has(a.id)) { readIds.add(a.id); syncRead(a.id, 'mark'); }
+    });
+  });
+  renderAll();
+}
+
+/* ══ ARTICLES ══ */
+async function loadArticles() {
+  try {
+    const data = await fetch('/api/articles').then(r=>r.json());
+    articles = data;
+  } catch(e) {
+    ['fun','f1','biathlon','foot'].forEach(cat => {
+      const el = document.getElementById('list-'+cat);
+      if (el) el.innerHTML = `<div class="error-msg">Impossible de charger les articles.<br><small>${e.message}</small></div>`;
+    });
+    return;
+  }
+  renderAll();
+}
+
+/* ══ RENDER ARTICLES ══ */
+function tagHtml(a) {
+  const map = { vdm:['tag-vdm','VDM'], dtc:['tag-dtc','DTC'], 'foot-fm':['tag-fm','Foot Mercato'] };
+  const [cls, lbl] = map[a.source] || ['tag-leq',"L'Équipe"];
+  return `<span class="article-source-tag ${cls}">${lbl}</span>`;
+}
+
+function renderList(containerId, cats) {
+  const c = document.getElementById(containerId);
+  if (!c) return;
+  const items = cats.flatMap(cat => articles[cat] || []);
+  if (!items.length) { c.innerHTML = '<div class="loading-msg">Aucun article disponible.</div>'; return; }
+
+  c.innerHTML = items.map(a => {
+    const read = readIds.has(a.id);
+    const text = a.title || a.content || '';
+    return `<div class="article-card ${read?'read':''}" onclick="openModal('${a.id}')">
+      <div class="article-main">
+        <div class="article-source-row">${tagHtml(a)}<span class="article-time">${relTime(a.date)}</span></div>
+        <div class="article-text">${text}</div>
+      </div>
+      <button class="read-action" onclick="toggleRead('${a.category}','${a.id}',event)" title="Marquer comme lu">
+        <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>
+    </div>`;
+  }).join('');
+}
+
+function unreadCount(cats) {
+  return cats.flatMap(c => articles[c]||[]).filter(a => !readIds.has(a.id)).length;
+}
+
+function renderBadges() {
+  const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'] };
+  Object.entries(g).forEach(([k,cats]) => {
+    const n = unreadCount(cats);
+    document.getElementById('tbadge-'+k).textContent = n;
+    document.getElementById('home-count-'+k).textContent = n;
+  });
+}
+
+function renderHomePreviews() {
+  const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'] };
+  Object.entries(g).forEach(([k,cats]) => {
+    const el = document.getElementById('home-preview-'+k);
+    if (!el) return;
+    const items = cats.flatMap(c => articles[c]||[]).filter(a=>!readIds.has(a.id)).slice(0,3);
+    el.innerHTML = items.map(a=>`<div class="home-preview-item">${(a.title||a.content||'').slice(0,65)}…</div>`).join('');
+  });
+}
+
+function renderAll() {
+  renderList('list-fun',      ['fun']);
+  renderList('list-f1',       ['f1']);
+  renderList('list-biathlon', ['biathlon']);
+  renderList('list-foot',     ['foot']);
+  renderBadges();
+  renderHomePreviews();
+}
+
+/* ══ MODAL ══ */
+const modalState = { id: null };
+const articleMap = {};
+
+function openModal(id) {
+  // Chercher l'article dans toutes les catégories
+  const a = Object.values(articles).flat().find(x => x.id === id);
+  if (!a) return;
+  modalState.id = id;
+
+  const map = { vdm:['tag-vdm','VDM'], dtc:['tag-dtc','DTC'], 'foot-fm':['tag-fm','Foot Mercato'] };
+  const [cls, lbl] = map[a.source] || ['tag-leq',"L'Équipe"];
+
+  document.getElementById('modal-tag').className = 'article-source-tag '+cls;
+  document.getElementById('modal-tag').textContent = lbl;
+  document.getElementById('modal-time').textContent = relTime(a.date);
+  document.getElementById('modal-open-link').href = a.link || '#';
+
+  // Afficher titre + contenu si différents
+  let bodyText = a.title || '';
+  if (a.content && a.content !== a.title && a.content.length > 10) {
+    bodyText += '\n\n' + a.content;
+  }
+  document.getElementById('modal-body').textContent = bodyText;
+
+  syncModalReadBtn();
+  document.getElementById('modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+
+function syncModalReadBtn() {
+  const btn = document.getElementById('modal-read-btn');
+  const read = readIds.has(modalState.id);
+  btn.textContent = read ? '✓ Lu' : '✓ Marquer comme lu';
+  btn.classList.toggle('done', read);
+}
+
+function modalToggleRead() {
+  const a = Object.values(articles).flat().find(x => x.id === modalState.id);
+  if (!a) return;
+  toggleRead(a.category, modalState.id);
+  syncModalReadBtn();
+}
+
+function closeModal(e)      { if (e.target === document.getElementById('modal-overlay')) closeModalDirect(); }
+function closeModalDirect() { document.getElementById('modal-overlay').classList.remove('open'); document.body.style.overflow = ''; }
+document.addEventListener('keydown', e => { if (e.key==='Escape') closeModalDirect(); });
+
+/* ══ TABS ══ */
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('page-'+btn.dataset.tab).classList.add('active');
+  });
+});
+document.querySelectorAll('.home-card').forEach(card => {
+  card.addEventListener('click', () => document.querySelector(`.tab[data-tab="${card.dataset.goto}"]`).click());
 });
 
-// ── Sources RSS avec URLs alternatives (fallback) ─────────────
-const SOURCES = [
-  {
-    id: 'vdm',
-    urls: [
-      'https://www.viedemerde.fr/rss',
-      'https://www.viedemerde.fr/feed',
-    ],
-    category: 'fun',
-    label: 'VDM',
-    limit: 15,
-  },
-  {
-    id: 'dtc',
-    urls: [
-      'https://danstonchat.com/feeds/',
-      'https://danstonchat.com/rss',
-      'https://danstonchat.com/feed',
-    ],
-    category: 'fun',
-    label: 'DTC',
-    limit: 15,
-  },
-  {
-    id: 'f1',
-    urls: [
-      'AO:https://www.lequipe.fr/rss/actu-hebdo_Formule-1.xml',
-      'RSSJ:https://www.lequipe.fr/rss/actu-hebdo_Formule-1.xml',
-      'AO:https://www.lequipe.fr/Xml/Formule1/Titres/actu_rss.xml',
-      'https://www.lequipe.fr/rss/actu-hebdo_Formule-1.xml',
-      'https://news.google.com/rss/search?q=formule+1+F1+grand+prix&hl=fr&gl=FR&ceid=FR:fr',
-    ],
-    category: 'f1',
-    label: 'leq',
-    limit: 20,
-  },
-  {
-    id: 'biathlon',
-    urls: [
-      'AO:https://www.lequipe.fr/rss/actu-hebdo_Biathlon.xml',
-      'RSSJ:https://www.lequipe.fr/rss/actu-hebdo_Biathlon.xml',
-      'AO:https://www.lequipe.fr/Xml/Biathlon/Titres/actu_rss.xml',
-      'https://www.lequipe.fr/rss/actu-hebdo_Biathlon.xml',
-      'https://news.google.com/rss/search?q=biathlon+coupe+du+monde&hl=fr&gl=FR&ceid=FR:fr',
-    ],
-    category: 'biathlon',
-    label: 'leq',
-    limit: 20,
-  },
-  {
-    id: 'foot-leq',
-    urls: [
-      'AO:https://www.lequipe.fr/rss/actu-hebdo_Football.xml',
-      'RSSJ:https://www.lequipe.fr/rss/actu-hebdo_Football.xml',
-      'AO:https://www.lequipe.fr/Xml/Football/Titres/actu_rss.xml',
-      'https://www.lequipe.fr/rss/actu-hebdo_Football.xml',
-      'https://news.google.com/rss/search?q=ligue+1+football+france&hl=fr&gl=FR&ceid=FR:fr',
-    ],
-    category: 'foot',
-    label: 'leq',
-    limit: 15,
-  },
-  {
-    id: 'foot-fm',
-    urls: [
-      'AO:https://www.footmercato.net/club/fc-barcelone/rss',
-      'RSSJ:https://www.footmercato.net/club/fc-barcelone/rss',
-      'AO:https://www.footmercato.net/rss.xml',
-      'https://www.footmercato.net/club/fc-barcelone/rss',
-      'https://news.google.com/rss/search?q=fc+barcelone+mercato+transfert&hl=fr&gl=FR&ceid=FR:fr',
-    ],
-    category: 'foot',
-    label: 'fm',
-    limit: 15,
-  },
-];
-
-// ── Filtre articles abonnés L'Équipe ──────────────────────────
-function isPremium(item) {
-  const title = (item.title || '').toLowerCase();
-  const cats = (item.categories || []).map((c) => String(c).toLowerCase());
-  return (
-    title.includes('abonnés') ||
-    title.includes('réservé') ||
-    title.includes('🔒') ||
-    cats.some((c) => c.includes('abonné') || c === 'premium')
-  );
-}
-
-// ── ID stable ─────────────────────────────────────────────────
-function makeId(str) {
-  let h = 0;
-  for (let i = 0; i < str.length; i++) { h = (h << 5) - h + str.charCodeAt(i); h |= 0; }
-  return Math.abs(h).toString(36);
-}
-
-// ── Nettoyage HTML ────────────────────────────────────────────
-function strip(html) {
-  return (html || '')
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, ' ')
-    .replace(/\s+/g, ' ').trim();
-}
-
-// ── Proxy 1 : allorigins.win (IP différente de Vercel) ───────
-async function fetchViaAllOrigins(rssUrl) {
-  const api = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
-  const res = await fetch(api, { signal: AbortSignal.timeout(12000) });
-  const data = await res.json();
-  if (!data.contents || data.contents.length < 100) throw new Error('allorigins: contenu vide');
-  const feed = await parser.parseString(data.contents);
-  console.log(`✓ allorigins → ${rssUrl} (${feed.items.length} items)`);
-  return feed.items;
-}
-
-// ── Proxy 2 : rss2json ────────────────────────────────────────
-async function fetchViaRss2Json(rssUrl, limit) {
-  const api = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=${limit}`;
-  const res = await fetch(api, { signal: AbortSignal.timeout(10000) });
-  const data = await res.json();
-  if (data.status !== 'ok') throw new Error(`rss2json: ${data.message || 'error'}`);
-  return data.items.map((item) => ({
-    title: item.title || '',
-    link: item.link || '',
-    isoDate: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
-    contentSnippet: strip(item.description || ''),
-    categories: item.categories || [],
-  }));
-}
-
-// ── Essaie chaque URL jusqu'à ce qu'une fonctionne ───────────
-// Préfixes spéciaux :
-//   "AO:"   → proxy allorigins.win
-//   "RSSJ:" → proxy rss2json
-async function fetchSource(src) {
-  let lastError;
-  for (const url of src.urls) {
-    try {
-      let rawItems;
-      if (url.startsWith('AO:')) {
-        rawItems = await fetchViaAllOrigins(url.slice(3));
-      } else if (url.startsWith('RSSJ:')) {
-        rawItems = await fetchViaRss2Json(url.slice(5), src.limit);
-      } else {
-        const feed = await parser.parseURL(url);
-        rawItems = feed.items;
-        console.log(`✓ ${src.id} → ${url} (${rawItems.length} items)`);
-      }
-      return {
-        category: src.category,
-        items: rawItems
-          .filter((item) => !isPremium(item))
-          .slice(0, src.limit)
-          .map((item) => ({
-            id: makeId(item.link || item.guid || item.title || String(Math.random())),
-            title: strip(item.title || ''),
-            link: item.link || '',
-            date: item.isoDate || item.pubDate || new Date().toISOString(),
-            content: strip(
-              item.contentFull || item.contentSnippet || item.content || item.summary || ''
-            ).slice(0, 800),
-            source: src.id,
-            label: src.label,
-            category: src.category,
-          })),
-      };
-    } catch (e) {
-      console.warn(`✗ ${src.id} → ${url}: ${e.message}`);
-      lastError = e;
-    }
-  }
-  throw lastError || new Error(`Toutes les URLs ont échoué pour ${src.id}`);
-}
-
-// ── Handler ───────────────────────────────────────────────────
-module.exports = async function handler(req, res) {
-  res.setHeader('Cache-Control', 's-maxage=180, stale-while-revalidate=60');
-
-  const results = await Promise.allSettled(SOURCES.map(fetchSource));
-
-  const byCategory = {};
-  for (const r of results) {
-    if (r.status !== 'fulfilled') {
-      console.error('Source failed:', r.reason?.message);
-      continue;
-    }
-    const { category, items } = r.value;
-    if (!byCategory[category]) byCategory[category] = [];
-    byCategory[category].push(...items);
-  }
-
-  for (const cat of Object.keys(byCategory)) {
-    byCategory[cat].sort((a, b) => new Date(b.date) - new Date(a.date));
-  }
-
-  ['fun', 'f1', 'biathlon', 'foot'].forEach(cat => {
-    if (!byCategory[cat]) byCategory[cat] = [];
-  });
-
-  res.status(200).json(byCategory);
+/* ══ MÉTÉO — Open-Meteo ══ */
+const WMO = {
+  0:['☀️','Ciel dégagé'],1:['🌤️','Peu nuageux'],2:['⛅','Partiellement nuageux'],3:['☁️','Couvert'],
+  45:['🌫️','Brouillard'],48:['🌫️','Brouillard givrant'],
+  51:['🌦️','Bruine légère'],53:['🌦️','Bruine'],55:['🌦️','Bruine dense'],
+  61:['🌧️','Pluie légère'],63:['🌧️','Pluie'],65:['🌧️','Pluie forte'],
+  71:['🌨️','Neige légère'],73:['🌨️','Neige'],75:['🌨️','Neige forte'],77:['🌨️','Grains de neige'],
+  80:['🌧️','Averses légères'],81:['🌧️','Averses'],82:['⛈️','Averses violentes'],
+  95:['⛈️','Orage'],96:['⛈️','Orage avec grêle'],99:['⛈️','Orage violent']
 };
+async function loadWeather() {
+  try {
+    const d = await (await fetch('https://api.open-meteo.com/v1/forecast?latitude=50.6292&longitude=3.0573&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=1&timezone=Europe%2FParis')).json();
+    const c=d.current, daily=d.daily, [icon,desc]=WMO[c.weather_code]||['🌡️',''];
+    document.getElementById('widget-meteo').innerHTML = `
+      <div class="widget-label">🌍 Lille</div><div class="widget-icon">${icon}</div>
+      <div class="widget-main">${Math.round(c.temperature_2m)}°C</div>
+      <div class="widget-sub">${desc} · ${Math.round(daily.temperature_2m_min[0])}–${Math.round(daily.temperature_2m_max[0])}°C</div>
+      <div class="widget-sub" style="margin-top:2px">💨 ${Math.round(c.wind_speed_10m)} km/h · 🌧 ${daily.precipitation_probability_max[0]}%</div>`;
+  } catch { document.getElementById('widget-meteo').innerHTML = `<div class="widget-label">🌍 Lille</div><div class="widget-sub" style="margin-top:8px">Indisponible</div><a class="widget-link" href="https://www.google.com/search?q=meteo+Lille" target="_blank">Voir sur Google →</a>`; }
+}
+
+/* ══ BITCOIN — CoinGecko ══ */
+async function loadBitcoin() {
+  try {
+    const d = await (await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true')).json();
+    const price=d.bitcoin.usd, change=d.bitcoin.usd_24h_change, up=change>=0;
+    document.getElementById('widget-btc').innerHTML = `
+      <div class="widget-label">₿ Bitcoin</div><div class="widget-icon">🟠</div>
+      <div class="widget-main">$${price.toLocaleString('fr-FR')}</div>
+      <div class="widget-change ${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(change).toFixed(2)}% aujourd'hui</div>`;
+  } catch { document.getElementById('widget-btc').innerHTML = `<div class="widget-label">₿ Bitcoin</div><a class="widget-link" style="margin-top:12px" href="https://www.coingecko.com/fr/pièces/bitcoin" target="_blank">Voir sur CoinGecko →</a>`; }
+}
+
+/* ══ FINANCE — via /api/finance (proxy Yahoo) ══ */
+async function loadFinance(ticker, isin, elementId, label, currency) {
+  const el = document.getElementById(elementId);
+  try {
+    const d = await (await fetch(`/api/finance?ticker=${encodeURIComponent(ticker)}`)).json();
+    if (d.error) throw new Error(d.error);
+    const up = d.change >= 0;
+    el.innerHTML = `
+      <div class="widget-label">${label}</div>
+      <div class="widget-main">${d.price.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} ${currency}</div>
+      ${d.change!==null?`<div class="widget-change ${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(d.change).toFixed(2)}%</div>`:''}
+      <div class="widget-sub" style="font-size:.62rem;margin-top:4px">${isin}</div>`;
+  } catch {
+    el.innerHTML = `
+      <div class="widget-label">${label}</div>
+      <a class="widget-link" style="margin-top:12px" href="https://finance.yahoo.com/quote/${ticker}" target="_blank">Voir le cours →</a>
+      <div class="widget-sub" style="font-size:.62rem;margin-top:4px">${isin}</div>`;
+  }
+}
+
+/* ══ F1 — Jolpica/Ergast ══ */
+function toParisTime(d,t) {
+  if (!t) return null;
+  const dt=new Date(d+'T'+t);
+  return { date:dt.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',timeZone:'Europe/Paris'}), time:dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Paris'}) };
+}
+async function loadF1GP() {
+  const el=document.getElementById('widget-gp');
+  try {
+    const d=await (await fetch('https://api.jolpi.ca/ergast/f1/current.json',{signal:AbortSignal.timeout(6000)})).json();
+    const races=d.MRData.RaceTable.Races, today=new Date().toISOString().split('T')[0];
+    const race=races.find(r=>r.date>=today)||races[races.length-1];
+    if (!race) { el.innerHTML='<div class="gp-empty">Aucun GP à venir.</div>'; return; }
+    const now=new Date();
+    const sessions=[
+      {key:'FirstPractice',label:'EL 1'},{key:'SecondPractice',label:'EL 2'},
+      {key:'SprintQualifying',label:'Qualif. Sprint'},{key:'Sprint',label:'Sprint'},
+      {key:'ThirdPractice',label:'EL 3'},{key:'Qualifying',label:'Qualifications'},
+    ].filter(s=>race[s.key]);
+    const mkSession=(name,date,time,isRace=false)=>{
+      const t=toParisTime(date,time);
+      const nextUp=new Date(date+'T'+(time||'12:00:00'))>now;
+      return `<div class="gp-session ${nextUp?'next-up':''}">
+        <div class="gp-session-name">${name}</div>
+        <div class="gp-session-date">${t?t.date:'—'}</div>
+        <div class="gp-session-time">${t?t.time:'—'}</div>
+      </div>`;
+    };
+    const sessHtml=sessions.map(s=>mkSession(s.label,race[s.key].date,race[s.key].time)).join('');
+    el.innerHTML=`<div class="gp-header"><div class="gp-title">🏎️ ${race.raceName}</div><div class="gp-round">Manche ${race.round} · ${race.Circuit?.circuitName||''}</div></div>
+      <div class="gp-sessions">${sessHtml}${mkSession('🏁 Course',race.date,race.time,true)}</div>`;
+  } catch { el.innerHTML=`<div class="gp-empty">Indisponible. <a href="https://www.lequipe.fr/Formule-1/" target="_blank" style="color:var(--accent-f1)">Voir sur L'Équipe →</a></div>`; }
+}
+
+/* ══ ÉQUIPES — ESPN API (sans clé, CORS ok) ══ */
+// Noms ESPN confirmés (identiques à data.team.displayName retourné par l'API)
+const ESPN_NAMES={'174':'AS Monaco','83':'Barcelona','3243':'Stade de Reims'};
+const TEAMS=[
+  {espnId:'174',  league:'fra.1', displayName:'AS Monaco',      id:'team-monaco'},
+  {espnId:'83',   league:'esp.1', displayName:'FC Barcelone',   id:'team-barce'},
+  {espnId:'3243', league:'fra.1', displayName:'Stade de Reims', id:'team-reims'},
+];
+function frDate(iso){ if(!iso)return''; const dt=new Date(iso); return dt.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',timeZone:'Europe/Paris'})+' · '+dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Paris'}); }
+async function loadTeam({espnId,league,displayName,id}){
+  const el=document.getElementById(id);
+  try{
+    const r=await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/teams/${espnId}/schedule`,{signal:AbortSignal.timeout(8000)});
+    const data=await r.json();
+    const events=data.events||[];
+    const now=new Date();
+    const completed=events.filter(e=>e.competitions?.[0]?.status?.type?.completed);
+    const upcoming=events.filter(e=>!e.competitions?.[0]?.status?.type?.completed&&new Date(e.date)>now);
+    const last=completed[completed.length-1];
+    const next=upcoming[0];
+    const teamInfo=data.team;
+    const badge=teamInfo?.logos?.[0]?.href?`<img class="team-badge" src="${teamInfo.logos[0].href}" alt="" onerror="this.style.display='none'" style="width:32px;height:32px;object-fit:contain">`:`<span style="font-size:1.3rem">⚽</span>`;
+    // On identifie notre équipe via homeAway + le nom ESPN confirmé (pas l'ID qui varie)
+    const myEspnName=ESPN_NAMES[espnId]||displayName;
+    let html=`<div class="team-header">${badge}<span class="team-name">${displayName}</span></div>`;
+    if(last){
+      const comp=last.competitions[0];
+      const homeC=comp.competitors.find(c=>c.homeAway==='home');
+      const awayC=comp.competitors.find(c=>c.homeAway==='away');
+      const isHome=(homeC?.team?.displayName||'')===myEspnName;
+      const myC=isHome?homeC:awayC, oppC=isHome?awayC:homeC;
+      const mySc=parseInt(myC?.score||0),oppSc=parseInt(oppC?.score||0);
+      const res=mySc>oppSc?'V':mySc<oppSc?'D':'N';
+      const opp=oppC?.team?.displayName||'?';
+      html+=`<div class="team-section"><div class="team-section-label">Dernier match</div><div class="team-match">
+        <div class="team-match-teams">${isHome?'🏠 ':''}vs ${opp}</div>
+        <div class="team-match-info"><span class="result-badge result-${res}">${res}</span><span class="score-text">${mySc} – ${oppSc}</span><span class="comp-text">${frDate(last.date)}</span></div>
+      </div></div>`;
+    }
+    if(next){
+      const comp=next.competitions[0];
+      const homeC=comp.competitors.find(c=>c.homeAway==='home');
+      const awayC=comp.competitors.find(c=>c.homeAway==='away');
+      const isHome=(homeC?.team?.displayName||'')===myEspnName;
+      const oppC=isHome?awayC:homeC;
+      const opp=oppC?.team?.displayName||'?';
+      html+=`<div class="team-section"><div class="team-section-label">Prochain match</div><div class="team-match">
+        <div class="team-match-teams">${isHome?'🏠 ':'🔀 '}vs ${opp}</div>
+        <div class="team-match-info"><span class="comp-text">${frDate(next.date)}</span></div>
+      </div></div>`;
+    }
+    if(!last&&!next) html+=`<div class="widget-sub">Aucun match trouvé</div>`;
+    el.innerHTML=html;
+  }catch(e){
+    el.innerHTML=`<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${displayName}</span></div><div class="widget-sub">Données indisponibles</div>`;
+  }
+}
+
+/* ══ INIT ══ */
+function updateClock(){ document.getElementById('last-update').textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); }
+updateClock(); setInterval(updateClock,60000);
+
+Promise.allSettled([fetchReadStatus(), loadArticles()]).then(renderAll);
+
+Promise.allSettled([
+  loadWeather(),
+  loadBitcoin(),
+  loadFinance('WPEA.PA',       'IE0002XZSHO1', 'widget-msci', '📈 MSCI World PEA', '€'),
+  loadFinance('ALCPB.PA',      'FR0011053636', 'widget-capb', '📊 Capital B',  '€'),
+  loadF1GP(),
+  ...TEAMS.map(t=>loadTeam(t)),
+
+]);
+</script>
+</body>
+</html>
