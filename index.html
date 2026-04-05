@@ -70,56 +70,25 @@
     .gp-session-time { font-size: .88rem; font-weight: 800; }
     .gp-empty { color: var(--muted); font-size: .85rem; }
 
-/* ══ ÉQUIPES — football-data.org via /api/football ══ */
-const TEAMS = [
-  { teamKey: 'monaco', displayName: 'AS Monaco',      id: 'team-monaco' },
-  { teamKey: 'barce',  displayName: 'FC Barcelone',   id: 'team-barce'  },
-  { teamKey: 'reims',  displayName: 'Stade de Reims', id: 'team-reims'  },
-];
-function frDate(iso) {
-  if (!iso) return '';
-  const dt = new Date(iso);
-  return dt.toLocaleDateString('fr-FR', { weekday:'short', day:'numeric', month:'short', timeZone:'Europe/Paris' })
-    + ' · ' + dt.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit', timeZone:'Europe/Paris' });
-}
-async function loadTeam({ teamKey, displayName, id }) {
-  const el = document.getElementById(id);
-  try {
-    const r = await fetch(`/api/football?team=${teamKey}`, { signal: AbortSignal.timeout(10000) });
-    const data = await r.json();
-    if (data.error) throw new Error(data.error);
-
-    let html = `<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${displayName}</span></div>`;
-
-    if (data.last) {
-      const m = data.last;
-      const isHome = m.homeTeam.id === data.teamId;
-      const opp = isHome ? (m.awayTeam.shortName || m.awayTeam.name) : (m.homeTeam.shortName || m.homeTeam.name);
-      const mySc = isHome ? m.score.fullTime.home : m.score.fullTime.away;
-      const oppSc = isHome ? m.score.fullTime.away : m.score.fullTime.home;
-      const res = mySc > oppSc ? 'V' : mySc < oppSc ? 'D' : 'N';
-      html += `<div class="team-section"><div class="team-section-label">Dernier match</div><div class="team-match">
-        <div class="team-match-teams">${isHome ? '🏠 ' : ''}vs ${opp}</div>
-        <div class="team-match-info"><span class="result-badge result-${res}">${res}</span><span class="score-text">${mySc} – ${oppSc}</span><span class="comp-text">${frDate(m.utcDate)}</span></div>
-      </div></div>`;
-    }
-
-    if (data.next) {
-      const m = data.next;
-      const isHome = m.homeTeam.id === data.teamId;
-      const opp = isHome ? (m.awayTeam.shortName || m.awayTeam.name) : (m.homeTeam.shortName || m.homeTeam.name);
-      html += `<div class="team-section"><div class="team-section-label">Prochain match</div><div class="team-match">
-        <div class="team-match-teams">${isHome ? '🏠 ' : '🔀 '}vs ${opp}</div>
-        <div class="team-match-info"><span class="comp-text">${frDate(m.utcDate)}</span></div>
-      </div></div>`;
-    }
-
-    if (!data.last && !data.next) html += `<div class="widget-sub">Aucun match trouvé</div>`;
-    el.innerHTML = html;
-  } catch(e) {
-    el.innerHTML = `<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${displayName}</span></div><div class="widget-sub">Données indisponibles</div>`;
-  }
-}
+    /* ÉQUIPES */
+    .teams-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
+    @media (max-width:700px) { .teams-row { grid-template-columns: 1fr; } }
+    .team-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+    .team-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+    .team-badge { width: 28px; height: 28px; object-fit: contain; }
+    .team-name { font-size: .88rem; font-weight: 700; }
+    .team-section { margin-bottom: 10px; }
+    .team-section-label { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-bottom: 5px; }
+    .team-match { background: var(--surface2); border-radius: 8px; padding: 8px 10px; }
+    .team-match-teams { font-size: .8rem; font-weight: 600; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .team-match-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .team-match-date { font-size: .7rem; color: var(--muted); }
+    .result-badge { font-size: .65rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; }
+    .result-V { background: rgba(39,174,96,.2); color: #27ae60; }
+    .result-D { background: rgba(224,74,109,.2); color: #e04a6d; }
+    .result-N { background: rgba(255,193,7,.15); color: #f0c040; }
+    .score-text { font-size: .78rem; font-weight: 700; }
+    .comp-text  { font-size: .68rem; color: var(--muted); }
 
     /* CATEGORY CARDS */
     .category-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
@@ -417,9 +386,13 @@ const modalState = { id: null };
 const articleMap = {};
 
 function openModal(id) {
-  // Chercher l'article dans toutes les catégories
   const a = Object.values(articles).flat().find(x => x.id === id);
   if (!a) return;
+  // L'Équipe et Footmercato → ouvrir dans un nouvel onglet (contenu payant)
+  if (a.label === 'leq' || a.label === 'fm') {
+    if (a.link) window.open(a.link, '_blank', 'noopener,noreferrer');
+    return;
+  }
   modalState.id = id;
 
   const map = { vdm:['tag-vdm','VDM'], dtc:['tag-dtc','DTC'], 'foot-fm':['tag-fm','Foot Mercato'] };
@@ -561,55 +534,42 @@ async function loadF1GP() {
   } catch { el.innerHTML=`<div class="gp-empty">Indisponible. <a href="https://www.lequipe.fr/Formule-1/" target="_blank" style="color:var(--accent-f1)">Voir sur L'Équipe →</a></div>`; }
 }
 
-/* ══ ÉQUIPES — ESPN API (sans clé, CORS ok) ══ */
+/* ══ ÉQUIPES — football-data.org via /api/football ══ */
 const TEAMS=[
-  {espnId:'174',  league:'fra.1', displayName:'AS Monaco',      id:'team-monaco'},
-  {espnId:'83',   league:'esp.1', displayName:'FC Barcelone',   id:'team-barce'},
-  {espnId:'3243', league:'fra.1', displayName:'Stade de Reims', id:'team-reims'},
+  {teamKey:'monaco', displayName:'AS Monaco',      id:'team-monaco'},
+  {teamKey:'barce',  displayName:'FC Barcelone',   id:'team-barce'},
+  {teamKey:'reims',  displayName:'Stade de Reims', id:'team-reims'},
 ];
 function frDate(iso){ if(!iso)return''; const dt=new Date(iso); return dt.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',timeZone:'Europe/Paris'})+' · '+dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Paris'}); }
-async function loadTeam({espnId,league,displayName,id}){
+async function loadTeam({teamKey,displayName,id}){
   const el=document.getElementById(id);
   try{
-    const r=await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/teams/${espnId}/schedule?season=2025`,{signal:AbortSignal.timeout(8000)});
+    const r=await fetch(`/api/football?team=${teamKey}`,{signal:AbortSignal.timeout(10000)});
     const data=await r.json();
-    const events=data.events||[];
-    const now=new Date();
-    const completed=events.filter(e=>e.competitions?.[0]?.status?.type?.completed);
-    const upcoming=events.filter(e=>!e.competitions?.[0]?.status?.type?.completed&&new Date(e.date)>now);
-    const last=completed[completed.length-1];
-    const next=upcoming[0];
-    const teamInfo=data.team;
-    // ESPN utilise data.team.id comme référence canonique (≠ espnId dans l'URL parfois)
-    const realId=String(teamInfo?.id||espnId);
-    const badge=teamInfo?.logos?.[0]?.href?`<img class="team-badge" src="${teamInfo.logos[0].href}" alt="" onerror="this.style.display='none'" style="width:32px;height:32px;object-fit:contain">`:`<span style="font-size:1.3rem">⚽</span>`;
-    let html=`<div class="team-header">${badge}<span class="team-name">${displayName}</span></div>`;
-    if(last){
-      const comp=last.competitions[0];
-      // Comparer c.team.id (ID d'équipe) et non c.id (ID de compétiteur)
-      const myTeam=comp.competitors.find(c=>String(c.team?.id)===realId);
-      const oppTeam=comp.competitors.find(c=>String(c.team?.id)!==realId);
-      const isHome=myTeam?.homeAway==='home';
-      const mySc=parseInt(myTeam?.score||0),oppSc=parseInt(oppTeam?.score||0);
+    if(data.error) throw new Error(data.error);
+    let html=`<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${displayName}</span></div>`;
+    if(data.last){
+      const m=data.last;
+      const isHome=m.homeTeam.id===data.teamId;
+      const opp=isHome?(m.awayTeam.shortName||m.awayTeam.name):(m.homeTeam.shortName||m.homeTeam.name);
+      const mySc=isHome?m.score.fullTime.home:m.score.fullTime.away;
+      const oppSc=isHome?m.score.fullTime.away:m.score.fullTime.home;
       const res=mySc>oppSc?'V':mySc<oppSc?'D':'N';
-      const opp=oppTeam?.team?.displayName||'?';
       html+=`<div class="team-section"><div class="team-section-label">Dernier match</div><div class="team-match">
         <div class="team-match-teams">${isHome?'🏠 ':''}vs ${opp}</div>
-        <div class="team-match-info"><span class="result-badge result-${res}">${res}</span><span class="score-text">${mySc} – ${oppSc}</span><span class="comp-text">${frDate(last.date)}</span></div>
+        <div class="team-match-info"><span class="result-badge result-${res}">${res}</span><span class="score-text">${mySc} – ${oppSc}</span><span class="comp-text">${frDate(m.utcDate)}</span></div>
       </div></div>`;
     }
-    if(next){
-      const comp=next.competitions[0];
-      const myTeam=comp.competitors.find(c=>String(c.team?.id)===realId);
-      const oppTeam=comp.competitors.find(c=>String(c.team?.id)!==realId);
-      const isHome=myTeam?.homeAway==='home';
-      const opp=oppTeam?.team?.displayName||'?';
+    if(data.next){
+      const m=data.next;
+      const isHome=m.homeTeam.id===data.teamId;
+      const opp=isHome?(m.awayTeam.shortName||m.awayTeam.name):(m.homeTeam.shortName||m.homeTeam.name);
       html+=`<div class="team-section"><div class="team-section-label">Prochain match</div><div class="team-match">
         <div class="team-match-teams">${isHome?'🏠 ':'🔀 '}vs ${opp}</div>
-        <div class="team-match-info"><span class="comp-text">${frDate(next.date)}</span></div>
+        <div class="team-match-info"><span class="comp-text">${frDate(m.utcDate)}</span></div>
       </div></div>`;
     }
-    if(!last&&!next) html+=`<div class="widget-sub">Aucun match trouvé</div>`;
+    if(!data.last&&!data.next) html+=`<div class="widget-sub">Aucun match trouvé</div>`;
     el.innerHTML=html;
   }catch(e){
     el.innerHTML=`<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${displayName}</span></div><div class="widget-sub">Données indisponibles</div>`;
@@ -629,7 +589,6 @@ Promise.allSettled([
   loadFinance('ALCPB.PA',      'FR0011053636', 'widget-capb', '📊 Capital B',  '€'),
   loadF1GP(),
   ...TEAMS.map(t=>loadTeam(t)),
-
 ]);
 </script>
 </body>
