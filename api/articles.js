@@ -3,7 +3,12 @@ const Parser = require('rss-parser');
 
 const parser = new Parser({
   timeout: 12000,
-  headers: { 'User-Agent': 'Mozilla/5.0 (compatible; MonDashboard/1.0; RSS Reader)' },
+  headers: {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+    'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+    'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
+    'Cache-Control': 'no-cache',
+  },
   customFields: { item: [['content:encoded', 'contentFull'], 'category'] },
 });
 
@@ -36,6 +41,9 @@ const SOURCES = [
       'https://www.lequipe.fr/rss/actu-hebdo_Formule-1.xml',
       'https://www.lequipe.fr/Xml/Formule1/Titres/actu_rss.xml',
       'https://www.lequipe.fr/Xml/actu_rss_Formule-1.xml',
+      // Fallback Google News si L'Équipe bloque le serveur
+      'https://news.google.com/rss/search?q=formule+1+source:lequipe.fr&hl=fr&gl=FR&ceid=FR:fr',
+      'https://news.google.com/rss/search?q=formule+1+F1&hl=fr&gl=FR&ceid=FR:fr',
     ],
     category: 'f1',
     label: 'leq',
@@ -47,6 +55,8 @@ const SOURCES = [
       'https://www.lequipe.fr/rss/actu-hebdo_Biathlon.xml',
       'https://www.lequipe.fr/Xml/Biathlon/Titres/actu_rss.xml',
       'https://www.lequipe.fr/Xml/actu_rss_Biathlon.xml',
+      // Fallback Google News
+      'https://news.google.com/rss/search?q=biathlon+coupe+du+monde&hl=fr&gl=FR&ceid=FR:fr',
     ],
     category: 'biathlon',
     label: 'leq',
@@ -58,6 +68,8 @@ const SOURCES = [
       'https://www.lequipe.fr/rss/actu-hebdo_Football.xml',
       'https://www.lequipe.fr/Xml/Football/Titres/actu_rss.xml',
       'https://www.lequipe.fr/Xml/actu_rss_Football.xml',
+      // Fallback Google News
+      'https://news.google.com/rss/search?q=football+ligue+1+champions+league&hl=fr&gl=FR&ceid=FR:fr',
     ],
     category: 'foot',
     label: 'leq',
@@ -69,6 +81,9 @@ const SOURCES = [
       'https://www.footmercato.net/club/fc-barcelone/rss',
       'https://www.footmercato.net/club/rss-fc-barcelone/',
       'https://www.footmercato.net/flux-rss/club/fc-barcelone',
+      'https://www.footmercato.net/rss.xml',
+      // Fallback Google News Barça
+      'https://news.google.com/rss/search?q=fc+barcelone+mercato+transfert&hl=fr&gl=FR&ceid=FR:fr',
     ],
     category: 'foot',
     label: 'fm',
