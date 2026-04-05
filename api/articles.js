@@ -64,7 +64,7 @@ const SOURCES = [
     ],
     category: 'foot',
     label: 'leq',
-    limit: 15,
+    limit: 50,
   },
   {
     id: 'foot-fm',
@@ -153,7 +153,7 @@ async function fetchSource(src) {
             date: item.isoDate || item.pubDate || new Date().toISOString(),
             content: strip(
               item.contentFull || item.contentSnippet || item.content || item.summary || ''
-            ).slice(0, 800),
+            ).slice(0, 3000),
             source: src.id,
             label: src.label,
             category: src.category,
