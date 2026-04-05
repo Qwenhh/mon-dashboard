@@ -549,12 +549,15 @@ async function loadTeam({espnId,league,displayName,id}){
     const last=completed[completed.length-1];
     const next=upcoming[0];
     const teamInfo=data.team;
+    // ESPN utilise data.team.id comme référence canonique (≠ espnId dans l'URL parfois)
+    const realId=String(teamInfo?.id||espnId);
     const badge=teamInfo?.logos?.[0]?.href?`<img class="team-badge" src="${teamInfo.logos[0].href}" alt="" onerror="this.style.display='none'" style="width:32px;height:32px;object-fit:contain">`:`<span style="font-size:1.3rem">⚽</span>`;
     let html=`<div class="team-header">${badge}<span class="team-name">${displayName}</span></div>`;
     if(last){
       const comp=last.competitions[0];
-      const myTeam=comp.competitors.find(c=>c.id===espnId);
-      const oppTeam=comp.competitors.find(c=>c.id!==espnId);
+      // Comparer c.team.id (ID d'équipe) et non c.id (ID de compétiteur)
+      const myTeam=comp.competitors.find(c=>String(c.team?.id)===realId);
+      const oppTeam=comp.competitors.find(c=>String(c.team?.id)!==realId);
       const isHome=myTeam?.homeAway==='home';
       const mySc=parseInt(myTeam?.score||0),oppSc=parseInt(oppTeam?.score||0);
       const res=mySc>oppSc?'V':mySc<oppSc?'D':'N';
@@ -566,8 +569,8 @@ async function loadTeam({espnId,league,displayName,id}){
     }
     if(next){
       const comp=next.competitions[0];
-      const myTeam=comp.competitors.find(c=>c.id===espnId);
-      const oppTeam=comp.competitors.find(c=>c.id!==espnId);
+      const myTeam=comp.competitors.find(c=>String(c.team?.id)===realId);
+      const oppTeam=comp.competitors.find(c=>String(c.team?.id)!==realId);
       const isHome=myTeam?.homeAway==='home';
       const opp=oppTeam?.team?.displayName||'?';
       html+=`<div class="team-section"><div class="team-section-label">Prochain match</div><div class="team-match">
