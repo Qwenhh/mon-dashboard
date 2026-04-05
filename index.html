@@ -530,44 +530,49 @@ async function loadF1GP() {
   } catch { el.innerHTML=`<div class="gp-empty">Indisponible. <a href="https://www.lequipe.fr/Formule-1/" target="_blank" style="color:var(--accent-f1)">Voir sur L'Équipe →</a></div>`; }
 }
 
-/* ══ ÉQUIPES — TheSportsDB ══ */
-// IDs directs TheSportsDB (évite les erreurs de recherche par nom)
+/* ══ ÉQUIPES — ESPN API (sans clé, CORS ok) ══ */
 const TEAMS=[
-  {teamId:'133823', displayName:'AS Monaco',      id:'team-monaco'},
-  {teamId:'133739', displayName:'FC Barcelone',   id:'team-barce'},
-  {teamId:'133934', displayName:'Stade de Reims', id:'team-reims'},
+  {espnId:'174',  league:'fra.1', displayName:'AS Monaco',      id:'team-monaco'},
+  {espnId:'83',   league:'esp.1', displayName:'FC Barcelone',   id:'team-barce'},
+  {espnId:'3243', league:'fra.1', displayName:'Stade de Reims', id:'team-reims'},
 ];
-function frDate(d,t){ if(!d)return''; const dt=new Date(d+(t?'T'+t:'T12:00:00')); return dt.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short'})+(t&&t!=='00:00:00'?' · '+dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Paris'}):''); }
-async function loadTeam({teamId,displayName,id}){
+function frDate(iso){ if(!iso)return''; const dt=new Date(iso); return dt.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',timeZone:'Europe/Paris'})+' · '+dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Paris'}); }
+async function loadTeam({espnId,league,displayName,id}){
   const el=document.getElementById(id);
   try{
-    const [lR,nR,tR]=await Promise.all([
-      fetch(`https://www.thesportsdb.com/api/v1/json/3/eventslast.php?id=${teamId}`,{signal:AbortSignal.timeout(8000)}),
-      fetch(`https://www.thesportsdb.com/api/v1/json/3/eventsnext.php?id=${teamId}`,{signal:AbortSignal.timeout(8000)}),
-      fetch(`https://www.thesportsdb.com/api/v1/json/3/lookupteam.php?id=${teamId}`,{signal:AbortSignal.timeout(6000)}),
-    ]);
-    const lastD=await lR.json(), nextD=await nR.json(), teamD=await tR.json();
-    const last=(lastD.results||[]).slice(-1)[0], next=(nextD.events||[])[0];
-    const teamName=(teamD.teams||[])[0]?.strTeam||displayName;
-    const badgeUrl=(teamD.teams||[])[0]?.strTeamBadge;
-    const badge=badgeUrl?`<img class="team-badge" src="${badgeUrl}/tiny" alt="" onerror="this.style.display='none'">`:`<span style="font-size:1.3rem">⚽</span>`;
+    const r=await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/${league}/teams/${espnId}/schedule`,{signal:AbortSignal.timeout(8000)});
+    const data=await r.json();
+    const events=data.events||[];
+    const now=new Date();
+    const completed=events.filter(e=>e.competitions?.[0]?.status?.type?.completed);
+    const upcoming=events.filter(e=>!e.competitions?.[0]?.status?.type?.completed&&new Date(e.date)>now);
+    const last=completed[completed.length-1];
+    const next=upcoming[0];
+    const teamInfo=data.team;
+    const badge=teamInfo?.logos?.[0]?.href?`<img class="team-badge" src="${teamInfo.logos[0].href}" alt="" onerror="this.style.display='none'" style="width:32px;height:32px;object-fit:contain">`:`<span style="font-size:1.3rem">⚽</span>`;
     let html=`<div class="team-header">${badge}<span class="team-name">${displayName}</span></div>`;
     if(last){
-      const hs=parseInt(last.intHomeScore),as=parseInt(last.intAwayScore);
-      const isHome=last.strHomeTeam===teamName;
-      const opp=isHome?last.strAwayTeam:last.strHomeTeam;
-      const mySc=isHome?hs:as,oppSc=isHome?as:hs;
-      const r=mySc>oppSc?'V':mySc<oppSc?'D':'N';
+      const comp=last.competitions[0];
+      const myTeam=comp.competitors.find(c=>c.id===espnId);
+      const oppTeam=comp.competitors.find(c=>c.id!==espnId);
+      const isHome=myTeam?.homeAway==='home';
+      const mySc=parseInt(myTeam?.score||0),oppSc=parseInt(oppTeam?.score||0);
+      const res=mySc>oppSc?'V':mySc<oppSc?'D':'N';
+      const opp=oppTeam?.team?.displayName||'?';
       html+=`<div class="team-section"><div class="team-section-label">Dernier match</div><div class="team-match">
         <div class="team-match-teams">${isHome?'🏠 ':''}vs ${opp}</div>
-        <div class="team-match-info">${!isNaN(hs)?`<span class="result-badge result-${r}">${r}</span><span class="score-text">${mySc} – ${oppSc}</span>`:''}<span class="comp-text">${frDate(last.dateEvent,last.strTime)}</span></div>
+        <div class="team-match-info"><span class="result-badge result-${res}">${res}</span><span class="score-text">${mySc} – ${oppSc}</span><span class="comp-text">${frDate(last.date)}</span></div>
       </div></div>`;
     }
     if(next){
-      const isHome=next.strHomeTeam===teamName;
+      const comp=next.competitions[0];
+      const myTeam=comp.competitors.find(c=>c.id===espnId);
+      const oppTeam=comp.competitors.find(c=>c.id!==espnId);
+      const isHome=myTeam?.homeAway==='home';
+      const opp=oppTeam?.team?.displayName||'?';
       html+=`<div class="team-section"><div class="team-section-label">Prochain match</div><div class="team-match">
-        <div class="team-match-teams">${isHome?'🏠 ':'🔀 '}vs ${isHome?next.strAwayTeam:next.strHomeTeam}</div>
-        <div class="team-match-info"><span class="comp-text">${frDate(next.dateEvent,next.strTime)}</span></div>
+        <div class="team-match-teams">${isHome?'🏠 ':'🔀 '}vs ${opp}</div>
+        <div class="team-match-info"><span class="comp-text">${frDate(next.date)}</span></div>
       </div></div>`;
     }
     if(!last&&!next) html+=`<div class="widget-sub">Aucun match trouvé</div>`;
@@ -590,6 +595,7 @@ Promise.allSettled([
   loadFinance('ALCPB.PA',      'FR0011053636', 'widget-capb', '📊 Capital B',  '€'),
   loadF1GP(),
   ...TEAMS.map(t=>loadTeam(t)),
+
 ]);
 </script>
 </body>
