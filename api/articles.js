@@ -38,12 +38,13 @@ const SOURCES = [
   {
     id: 'f1',
     urls: [
+      // 1. Proxy rss2json (contourne le blocage Vercel → L'Équipe)
+      'RSSJ:https://www.lequipe.fr/rss/actu-hebdo_Formule-1.xml',
+      'RSSJ:https://www.lequipe.fr/Xml/Formule1/Titres/actu_rss.xml',
+      // 2. Direct (peut être bloqué)
       'https://www.lequipe.fr/rss/actu-hebdo_Formule-1.xml',
-      'https://www.lequipe.fr/Xml/Formule1/Titres/actu_rss.xml',
-      'https://www.lequipe.fr/Xml/actu_rss_Formule-1.xml',
-      // Fallback Google News si L'Équipe bloque le serveur
-      'https://news.google.com/rss/search?q=formule+1+source:lequipe.fr&hl=fr&gl=FR&ceid=FR:fr',
-      'https://news.google.com/rss/search?q=formule+1+F1&hl=fr&gl=FR&ceid=FR:fr',
+      // 3. Google News dernier recours
+      'https://news.google.com/rss/search?q=formule+1+F1+grand+prix&hl=fr&gl=FR&ceid=FR:fr',
     ],
     category: 'f1',
     label: 'leq',
@@ -52,10 +53,9 @@ const SOURCES = [
   {
     id: 'biathlon',
     urls: [
+      'RSSJ:https://www.lequipe.fr/rss/actu-hebdo_Biathlon.xml',
+      'RSSJ:https://www.lequipe.fr/Xml/Biathlon/Titres/actu_rss.xml',
       'https://www.lequipe.fr/rss/actu-hebdo_Biathlon.xml',
-      'https://www.lequipe.fr/Xml/Biathlon/Titres/actu_rss.xml',
-      'https://www.lequipe.fr/Xml/actu_rss_Biathlon.xml',
-      // Fallback Google News
       'https://news.google.com/rss/search?q=biathlon+coupe+du+monde&hl=fr&gl=FR&ceid=FR:fr',
     ],
     category: 'biathlon',
@@ -65,11 +65,10 @@ const SOURCES = [
   {
     id: 'foot-leq',
     urls: [
+      'RSSJ:https://www.lequipe.fr/rss/actu-hebdo_Football.xml',
+      'RSSJ:https://www.lequipe.fr/Xml/Football/Titres/actu_rss.xml',
       'https://www.lequipe.fr/rss/actu-hebdo_Football.xml',
-      'https://www.lequipe.fr/Xml/Football/Titres/actu_rss.xml',
-      'https://www.lequipe.fr/Xml/actu_rss_Football.xml',
-      // Fallback Google News
-      'https://news.google.com/rss/search?q=football+ligue+1+champions+league&hl=fr&gl=FR&ceid=FR:fr',
+      'https://news.google.com/rss/search?q=ligue+1+football+france&hl=fr&gl=FR&ceid=FR:fr',
     ],
     category: 'foot',
     label: 'leq',
@@ -78,11 +77,9 @@ const SOURCES = [
   {
     id: 'foot-fm',
     urls: [
+      'RSSJ:https://www.footmercato.net/club/fc-barcelone/rss',
+      'RSSJ:https://www.footmercato.net/rss.xml',
       'https://www.footmercato.net/club/fc-barcelone/rss',
-      'https://www.footmercato.net/club/rss-fc-barcelone/',
-      'https://www.footmercato.net/flux-rss/club/fc-barcelone',
-      'https://www.footmercato.net/rss.xml',
-      // Fallback Google News Barça
       'https://news.google.com/rss/search?q=fc+barcelone+mercato+transfert&hl=fr&gl=FR&ceid=FR:fr',
     ],
     category: 'foot',
@@ -119,16 +116,40 @@ function strip(html) {
     .replace(/\s+/g, ' ').trim();
 }
 
+// ── Proxy rss2json (contourne le blocage des IPs Vercel par L'Équipe) ─
+async function fetchViaRss2Json(rssUrl, limit) {
+  const api = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=${limit}`;
+  const res = await fetch(api, { signal: AbortSignal.timeout(10000) });
+  const data = await res.json();
+  if (data.status !== 'ok') throw new Error(`rss2json: ${data.message || 'error'}`);
+  return data.items.map((item) => ({
+    title: strip(item.title || ''),
+    link: item.link || '',
+    isoDate: item.pubDate ? new Date(item.pubDate).toISOString() : new Date().toISOString(),
+    contentSnippet: strip(item.description || ''),
+    categories: item.categories || [],
+  }));
+}
+
 // ── Essaie chaque URL jusqu'à ce qu'une fonctionne ───────────
+// Préfixe "RSSJ:" → passe par le proxy rss2json au lieu du parser direct
 async function fetchSource(src) {
   let lastError;
   for (const url of src.urls) {
     try {
-      const feed = await parser.parseURL(url);
-      console.log(`✓ ${src.id} → ${url} (${feed.items.length} items)`);
+      let rawItems;
+      if (url.startsWith('RSSJ:')) {
+        const realUrl = url.slice(5);
+        rawItems = await fetchViaRss2Json(realUrl, src.limit);
+        console.log(`✓ ${src.id} → rss2json(${realUrl}) (${rawItems.length} items)`);
+      } else {
+        const feed = await parser.parseURL(url);
+        rawItems = feed.items;
+        console.log(`✓ ${src.id} → ${url} (${rawItems.length} items)`);
+      }
       return {
         category: src.category,
-        items: feed.items
+        items: rawItems
           .filter((item) => !isPremium(item))
           .slice(0, src.limit)
           .map((item) => ({
