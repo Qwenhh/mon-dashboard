@@ -70,25 +70,56 @@
     .gp-session-time { font-size: .88rem; font-weight: 800; }
     .gp-empty { color: var(--muted); font-size: .85rem; }
 
-    /* ÉQUIPES */
-    .teams-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 10px; }
-    @media (max-width:700px) { .teams-row { grid-template-columns: 1fr; } }
-    .team-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
-    .team-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-    .team-badge { width: 28px; height: 28px; object-fit: contain; }
-    .team-name { font-size: .88rem; font-weight: 700; }
-    .team-section { margin-bottom: 10px; }
-    .team-section-label { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-bottom: 5px; }
-    .team-match { background: var(--surface2); border-radius: 8px; padding: 8px 10px; }
-    .team-match-teams { font-size: .8rem; font-weight: 600; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .team-match-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-    .team-match-date { font-size: .7rem; color: var(--muted); }
-    .result-badge { font-size: .65rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; }
-    .result-V { background: rgba(39,174,96,.2); color: #27ae60; }
-    .result-D { background: rgba(224,74,109,.2); color: #e04a6d; }
-    .result-N { background: rgba(255,193,7,.15); color: #f0c040; }
-    .score-text { font-size: .78rem; font-weight: 700; }
-    .comp-text  { font-size: .68rem; color: var(--muted); }
+/* ══ ÉQUIPES — football-data.org via /api/football ══ */
+const TEAMS = [
+  { teamKey: 'monaco', displayName: 'AS Monaco',      id: 'team-monaco' },
+  { teamKey: 'barce',  displayName: 'FC Barcelone',   id: 'team-barce'  },
+  { teamKey: 'reims',  displayName: 'Stade de Reims', id: 'team-reims'  },
+];
+function frDate(iso) {
+  if (!iso) return '';
+  const dt = new Date(iso);
+  return dt.toLocaleDateString('fr-FR', { weekday:'short', day:'numeric', month:'short', timeZone:'Europe/Paris' })
+    + ' · ' + dt.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit', timeZone:'Europe/Paris' });
+}
+async function loadTeam({ teamKey, displayName, id }) {
+  const el = document.getElementById(id);
+  try {
+    const r = await fetch(`/api/football?team=${teamKey}`, { signal: AbortSignal.timeout(10000) });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+
+    let html = `<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${displayName}</span></div>`;
+
+    if (data.last) {
+      const m = data.last;
+      const isHome = m.homeTeam.id === data.teamId;
+      const opp = isHome ? (m.awayTeam.shortName || m.awayTeam.name) : (m.homeTeam.shortName || m.homeTeam.name);
+      const mySc = isHome ? m.score.fullTime.home : m.score.fullTime.away;
+      const oppSc = isHome ? m.score.fullTime.away : m.score.fullTime.home;
+      const res = mySc > oppSc ? 'V' : mySc < oppSc ? 'D' : 'N';
+      html += `<div class="team-section"><div class="team-section-label">Dernier match</div><div class="team-match">
+        <div class="team-match-teams">${isHome ? '🏠 ' : ''}vs ${opp}</div>
+        <div class="team-match-info"><span class="result-badge result-${res}">${res}</span><span class="score-text">${mySc} – ${oppSc}</span><span class="comp-text">${frDate(m.utcDate)}</span></div>
+      </div></div>`;
+    }
+
+    if (data.next) {
+      const m = data.next;
+      const isHome = m.homeTeam.id === data.teamId;
+      const opp = isHome ? (m.awayTeam.shortName || m.awayTeam.name) : (m.homeTeam.shortName || m.homeTeam.name);
+      html += `<div class="team-section"><div class="team-section-label">Prochain match</div><div class="team-match">
+        <div class="team-match-teams">${isHome ? '🏠 ' : '🔀 '}vs ${opp}</div>
+        <div class="team-match-info"><span class="comp-text">${frDate(m.utcDate)}</span></div>
+      </div></div>`;
+    }
+
+    if (!data.last && !data.next) html += `<div class="widget-sub">Aucun match trouvé</div>`;
+    el.innerHTML = html;
+  } catch(e) {
+    el.innerHTML = `<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${displayName}</span></div><div class="widget-sub">Données indisponibles</div>`;
+  }
+}
 
     /* CATEGORY CARDS */
     .category-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 10px; }
