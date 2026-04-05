@@ -12,6 +12,7 @@ const parser = new Parser({
   customFields: { item: [['content:encoded', 'contentFull'], 'category'] },
 });
 
+// ── Sources RSS avec URLs alternatives (fallback) ─────────────
 const SOURCES = [
   {
     id: 'vdm',
@@ -28,6 +29,7 @@ const SOURCES = [
     urls: [
       'https://danstonchat.com/feeds/',
       'https://danstonchat.com/rss',
+      'https://danstonchat.com/feed',
     ],
     category: 'fun',
     label: 'DTC',
@@ -36,9 +38,11 @@ const SOURCES = [
   {
     id: 'f1',
     urls: [
-      'https://dwh.lequipe.fr/api/edito/rss?path=/Formule-1/',
-      'AO:https://dwh.lequipe.fr/api/edito/rss?path=/Formule-1/',
-      'RSSJ:https://dwh.lequipe.fr/api/edito/rss?path=/Formule-1/',
+      'AO:https://www.lequipe.fr/rss/actu-hebdo_Formule-1.xml',    // allorigins proxy
+      'RSSJ:https://www.lequipe.fr/rss/actu-hebdo_Formule-1.xml',  // rss2json proxy
+      'AO:https://www.lequipe.fr/Xml/Formule1/Titres/actu_rss.xml',
+      'https://www.lequipe.fr/rss/actu-hebdo_Formule-1.xml',       // direct (peut être bloqué)
+      'https://news.google.com/rss/search?q=formule+1+F1+grand+prix&hl=fr&gl=FR&ceid=FR:fr',
     ],
     category: 'f1',
     label: 'leq',
@@ -47,9 +51,11 @@ const SOURCES = [
   {
     id: 'biathlon',
     urls: [
-      'https://dwh.lequipe.fr/api/edito/rss?path=/Biathlon/',
-      'AO:https://dwh.lequipe.fr/api/edito/rss?path=/Biathlon/',
-      'RSSJ:https://dwh.lequipe.fr/api/edito/rss?path=/Biathlon/',
+      'AO:https://www.lequipe.fr/rss/actu-hebdo_Biathlon.xml',
+      'RSSJ:https://www.lequipe.fr/rss/actu-hebdo_Biathlon.xml',
+      'AO:https://www.lequipe.fr/Xml/Biathlon/Titres/actu_rss.xml',
+      'https://www.lequipe.fr/rss/actu-hebdo_Biathlon.xml',
+      'https://news.google.com/rss/search?q=biathlon+coupe+du+monde&hl=fr&gl=FR&ceid=FR:fr',
     ],
     category: 'biathlon',
     label: 'leq',
@@ -58,20 +64,24 @@ const SOURCES = [
   {
     id: 'foot-leq',
     urls: [
-      'https://dwh.lequipe.fr/api/edito/rss?path=/Football/',
-      'AO:https://dwh.lequipe.fr/api/edito/rss?path=/Football/',
-      'RSSJ:https://dwh.lequipe.fr/api/edito/rss?path=/Football/',
+      'AO:https://www.lequipe.fr/rss/actu-hebdo_Football.xml',
+      'RSSJ:https://www.lequipe.fr/rss/actu-hebdo_Football.xml',
+      'AO:https://www.lequipe.fr/Xml/Football/Titres/actu_rss.xml',
+      'https://www.lequipe.fr/rss/actu-hebdo_Football.xml',
+      'https://news.google.com/rss/search?q=ligue+1+football+france&hl=fr&gl=FR&ceid=FR:fr',
     ],
     category: 'foot',
     label: 'leq',
-    limit: 50,
+    limit: 15,
   },
   {
     id: 'foot-fm',
     urls: [
-      'https://www.footmercato.net/club/fc-barcelone/rss',
       'AO:https://www.footmercato.net/club/fc-barcelone/rss',
       'RSSJ:https://www.footmercato.net/club/fc-barcelone/rss',
+      'AO:https://www.footmercato.net/rss.xml',
+      'https://www.footmercato.net/club/fc-barcelone/rss',
+      'https://news.google.com/rss/search?q=fc+barcelone+mercato+transfert&hl=fr&gl=FR&ceid=FR:fr',
     ],
     category: 'foot',
     label: 'fm',
@@ -79,6 +89,7 @@ const SOURCES = [
   },
 ];
 
+// ── Filtre articles abonnés L'Équipe ──────────────────────────
 function isPremium(item) {
   const title = (item.title || '').toLowerCase();
   const cats = (item.categories || []).map((c) => String(c).toLowerCase());
@@ -90,12 +101,14 @@ function isPremium(item) {
   );
 }
 
+// ── ID stable ─────────────────────────────────────────────────
 function makeId(str) {
   let h = 0;
   for (let i = 0; i < str.length; i++) { h = (h << 5) - h + str.charCodeAt(i); h |= 0; }
   return Math.abs(h).toString(36);
 }
 
+// ── Nettoyage HTML ────────────────────────────────────────────
 function strip(html) {
   return (html || '')
     .replace(/<[^>]+>/g, ' ')
@@ -104,15 +117,31 @@ function strip(html) {
     .replace(/\s+/g, ' ').trim();
 }
 
+// ── Correction XML malformé (& non échappés — bug L'Équipe F1) ─
+function fixXml(xml) {
+  return xml.replace(/&(?!(amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)/g, '&amp;');
+}
+
+// ── Headers pour fetch direct ─────────────────────────────────
+const FETCH_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+  'Accept': 'application/rss+xml, application/xml, text/xml, */*',
+  'Accept-Language': 'fr-FR,fr;q=0.9',
+};
+
+// ── Proxy 1 : allorigins.win (IP différente de Vercel) ───────
 async function fetchViaAllOrigins(rssUrl) {
   const api = `https://api.allorigins.win/get?url=${encodeURIComponent(rssUrl)}`;
   const res = await fetch(api, { signal: AbortSignal.timeout(12000) });
   const data = await res.json();
   if (!data.contents || data.contents.length < 100) throw new Error('allorigins: contenu vide');
-  const feed = await parser.parseString(data.contents);
+  // fixXml corrige les & non échappés (bug connu flux L'Équipe F1)
+  const feed = await parser.parseString(fixXml(data.contents));
+  console.log(`✓ allorigins → ${rssUrl} (${feed.items.length} items)`);
   return feed.items;
 }
 
+// ── Proxy 2 : rss2json ────────────────────────────────────────
 async function fetchViaRss2Json(rssUrl, limit) {
   const api = `https://api.rss2json.com/v1/api.json?rss_url=${encodeURIComponent(rssUrl)}&count=${limit}`;
   const res = await fetch(api, { signal: AbortSignal.timeout(10000) });
@@ -127,6 +156,10 @@ async function fetchViaRss2Json(rssUrl, limit) {
   }));
 }
 
+// ── Essaie chaque URL jusqu'à ce qu'une fonctionne ───────────
+// Préfixes spéciaux :
+//   "AO:"   → proxy allorigins.win
+//   "RSSJ:" → proxy rss2json
 async function fetchSource(src) {
   let lastError;
   for (const url of src.urls) {
@@ -137,10 +170,14 @@ async function fetchSource(src) {
       } else if (url.startsWith('RSSJ:')) {
         rawItems = await fetchViaRss2Json(url.slice(5), src.limit);
       } else {
-        const feed = await parser.parseURL(url);
+        // Fetch direct avec fixXml pour corriger le XML malformé
+        const rawRes = await fetch(url, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12000) });
+        if (!rawRes.ok) throw new Error(`HTTP ${rawRes.status}`);
+        const rawXml = await rawRes.text();
+        const feed = await parser.parseString(fixXml(rawXml));
         rawItems = feed.items;
+        console.log(`✓ ${src.id} → ${url} (${rawItems.length} items)`);
       }
-      console.log(`✓ ${src.id} → ${url} (${rawItems.length} items)`);
       return {
         category: src.category,
         items: rawItems
@@ -153,7 +190,7 @@ async function fetchSource(src) {
             date: item.isoDate || item.pubDate || new Date().toISOString(),
             content: strip(
               item.contentFull || item.contentSnippet || item.content || item.summary || ''
-            ).slice(0, 3000),
+            ).slice(0, 800),
             source: src.id,
             label: src.label,
             category: src.category,
@@ -167,21 +204,31 @@ async function fetchSource(src) {
   throw lastError || new Error(`Toutes les URLs ont échoué pour ${src.id}`);
 }
 
+// ── Handler ───────────────────────────────────────────────────
 module.exports = async function handler(req, res) {
   res.setHeader('Cache-Control', 's-maxage=180, stale-while-revalidate=60');
+
   const results = await Promise.allSettled(SOURCES.map(fetchSource));
+
   const byCategory = {};
   for (const r of results) {
-    if (r.status !== 'fulfilled') { console.error('Source failed:', r.reason?.message); continue; }
+    if (r.status !== 'fulfilled') {
+      console.error('Source failed:', r.reason?.message);
+      continue;
+    }
     const { category, items } = r.value;
     if (!byCategory[category]) byCategory[category] = [];
     byCategory[category].push(...items);
   }
+
   for (const cat of Object.keys(byCategory)) {
     byCategory[cat].sort((a, b) => new Date(b.date) - new Date(a.date));
   }
+
+  // Toujours renvoyer toutes les catégories même vides
   ['fun', 'f1', 'biathlon', 'foot'].forEach(cat => {
     if (!byCategory[cat]) byCategory[cat] = [];
   });
+
   res.status(200).json(byCategory);
 };
