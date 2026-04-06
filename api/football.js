@@ -20,7 +20,6 @@ module.exports = async function handler(req, res) {
 
   const headers = {
     'x-apisports-key': key,
-    'x-rapidapi-host': 'v3.football.api-sports.io',
   };
   const BASE = 'https://v3.football.api-sports.io';
   const teamId = cfg.id;
@@ -62,6 +61,12 @@ module.exports = async function handler(req, res) {
       teamId,
       last: lastFixture ? computeMatchInfo(lastFixture) : null,
       next: nextFixture ? computeMatchInfo(nextFixture) : null,
+      _debug: {
+        lastErrors: lastData.errors,
+        lastResults: lastData.results,
+        nextErrors: nextData.errors,
+        nextResults: nextData.results,
+      },
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
