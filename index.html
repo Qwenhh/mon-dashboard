@@ -544,35 +544,30 @@ function frDate(iso){ if(!iso)return''; const dt=new Date(iso); return dt.toLoca
 async function loadTeam({teamKey,displayName,id}){
   const el=document.getElementById(id);
   try{
-    const r=await fetch(`/api/football?team=${teamKey}`,{signal:AbortSignal.timeout(10000)});
+    const r=await fetch(`/api/football?team=${teamKey}`,{signal:AbortSignal.timeout(12000)});
     const data=await r.json();
     if(data.error) throw new Error(data.error);
     let html=`<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${displayName}</span></div>`;
+    // isHome, opponent, myScore, oppScore sont maintenant pré-calculés côté serveur
     if(data.last){
       const m=data.last;
-      const isHome=m.homeTeam.id===data.teamId;
-      const opp=isHome?(m.awayTeam.shortName||m.awayTeam.name):(m.homeTeam.shortName||m.homeTeam.name);
-      const mySc=isHome?m.score.fullTime.home:m.score.fullTime.away;
-      const oppSc=isHome?m.score.fullTime.away:m.score.fullTime.home;
-      const res=mySc>oppSc?'V':mySc<oppSc?'D':'N';
-      html+=`<div class="team-section"><div class="team-section-label">Dernier match</div><div class="team-match">
-        <div class="team-match-teams">${isHome?'🏠 ':''}vs ${opp}</div>
-        <div class="team-match-info"><span class="result-badge result-${res}">${res}</span><span class="score-text">${mySc} – ${oppSc}</span><span class="comp-text">${frDate(m.utcDate)}</span></div>
+      const res=m.myScore>m.oppScore?'V':m.myScore<m.oppScore?'D':'N';
+      html+=`<div class="team-section"><div class="team-section-label">Dernier match <span style="font-size:.65rem;color:var(--muted)">${m.competition||''}</span></div><div class="team-match">
+        <div class="team-match-teams">${m.isHome?'🏠 ':'✈️ '}vs ${m.opponent}</div>
+        <div class="team-match-info"><span class="result-badge result-${res}">${res}</span><span class="score-text">${m.myScore} – ${m.oppScore}</span><span class="comp-text">${frDate(m.utcDate)}</span></div>
       </div></div>`;
     }
     if(data.next){
       const m=data.next;
-      const isHome=m.homeTeam.id===data.teamId;
-      const opp=isHome?(m.awayTeam.shortName||m.awayTeam.name):(m.homeTeam.shortName||m.homeTeam.name);
-      html+=`<div class="team-section"><div class="team-section-label">Prochain match</div><div class="team-match">
-        <div class="team-match-teams">${isHome?'🏠 ':'🔀 '}vs ${opp}</div>
+      html+=`<div class="team-section"><div class="team-section-label">Prochain match <span style="font-size:.65rem;color:var(--muted)">${m.competition||''}</span></div><div class="team-match">
+        <div class="team-match-teams">${m.isHome?'🏠 ':'✈️ '}vs ${m.opponent}</div>
         <div class="team-match-info"><span class="comp-text">${frDate(m.utcDate)}</span></div>
       </div></div>`;
     }
     if(!data.last&&!data.next) html+=`<div class="widget-sub">Aucun match trouvé</div>`;
     el.innerHTML=html;
   }catch(e){
-    el.innerHTML=`<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${displayName}</span></div><div class="widget-sub">Données indisponibles</div>`;
+    el.innerHTML=`<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${displayName}</span></div><div class="widget-sub">Données indisponibles — ${e.message}</div>`;
   }
 }
 
