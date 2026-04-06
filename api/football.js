@@ -35,7 +35,7 @@ module.exports = async function handler(req, res) {
 
   try {
     const [lastRes, nextRes] = await Promise.all([
-      fetch(`${BASE}/teams/${teamId}/matches?status=FINISHED&limit=1`, { headers, signal: AbortSignal.timeout(8000) }),
+      fetch(`${BASE}/teams/${teamId}/matches?status=FINISHED&limit=5`, { headers, signal: AbortSignal.timeout(8000) }),
       fetch(`${BASE}/teams/${teamId}/matches?status=SCHEDULED&limit=1`, { headers, signal: AbortSignal.timeout(8000) }),
     ]);
 
@@ -44,13 +44,22 @@ module.exports = async function handler(req, res) {
     const lastMatches = lastData.matches || [];
     const nextMatches = nextData.matches || [];
 
+    // FINISHED : football-data renvoie en ordre chronologique → le plus récent est à la fin
     const lastMatch = lastMatches.length ? lastMatches[lastMatches.length - 1] : null;
+    // SCHEDULED : le plus proche est en premier
     const nextMatch = nextMatches.length ? nextMatches[0] : null;
 
     res.status(200).json({
       teamId,
       last: lastMatch ? computeMatchInfo(lastMatch) : null,
       next: nextMatch ? computeMatchInfo(nextMatch) : null,
+      _debug: {
+        lastCount: lastMatches.length,
+        nextCount: nextMatches.length,
+        lastError: lastData.errorCode || lastData.message || null,
+        nextError: nextData.errorCode || nextData.message || null,
+        lastSample: lastMatches.slice(-1).map(m => ({ date: m.utcDate, status: m.status, home: m.homeTeam?.name, away: m.awayTeam?.name })),
+      },
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
