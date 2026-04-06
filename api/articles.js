@@ -12,80 +12,53 @@ const parser = new Parser({
   customFields: { item: [['content:encoded', 'contentFull'], 'category'] },
 });
 
-// ── Sources RSS avec URLs alternatives (fallback) ─────────────
+// ── Sources RSS ───────────────────────────────────────────────
 const SOURCES = [
   {
     id: 'vdm',
-    urls: [
-      'https://www.viedemerde.fr/rss',
-      'https://www.viedemerde.fr/feed',
-    ],
-    category: 'fun',
-    label: 'VDM',
-    limit: 15,
+    urls: ['https://www.viedemerde.fr/rss', 'https://www.viedemerde.fr/feed'],
+    category: 'fun', label: 'VDM', limit: 15,
   },
   {
     id: 'dtc',
-    urls: [
-      'https://danstonchat.com/feeds/',
-      'https://danstonchat.com/rss',
-      'https://danstonchat.com/feed',
-    ],
-    category: 'fun',
-    label: 'DTC',
-    limit: 15,
+    urls: ['https://danstonchat.com/feeds/', 'https://danstonchat.com/rss'],
+    category: 'fun', label: 'DTC', limit: 15,
   },
   {
     id: 'f1',
     urls: [
-      'AO:https://www.lequipe.fr/rss/actu-hebdo_Formule-1.xml',    // allorigins proxy
-      'RSSJ:https://www.lequipe.fr/rss/actu-hebdo_Formule-1.xml',  // rss2json proxy
-      'AO:https://www.lequipe.fr/Xml/Formule1/Titres/actu_rss.xml',
-      'https://www.lequipe.fr/rss/actu-hebdo_Formule-1.xml',       // direct (peut être bloqué)
-      'https://news.google.com/rss/search?q=formule+1+F1+grand+prix&hl=fr&gl=FR&ceid=FR:fr',
+      'https://dwh.lequipe.fr/api/edito/rss?path=/Formule-1/',
+      'AO:https://dwh.lequipe.fr/api/edito/rss?path=/Formule-1/',
+      'RSSJ:https://dwh.lequipe.fr/api/edito/rss?path=/Formule-1/',
     ],
-    category: 'f1',
-    label: 'leq',
-    limit: 20,
+    category: 'f1', label: 'leq', limit: 20,
   },
   {
     id: 'biathlon',
     urls: [
-      'AO:https://www.lequipe.fr/rss/actu-hebdo_Biathlon.xml',
-      'RSSJ:https://www.lequipe.fr/rss/actu-hebdo_Biathlon.xml',
-      'AO:https://www.lequipe.fr/Xml/Biathlon/Titres/actu_rss.xml',
-      'https://www.lequipe.fr/rss/actu-hebdo_Biathlon.xml',
-      'https://news.google.com/rss/search?q=biathlon+coupe+du+monde&hl=fr&gl=FR&ceid=FR:fr',
+      'https://dwh.lequipe.fr/api/edito/rss?path=/Biathlon/',
+      'AO:https://dwh.lequipe.fr/api/edito/rss?path=/Biathlon/',
+      'RSSJ:https://dwh.lequipe.fr/api/edito/rss?path=/Biathlon/',
     ],
-    category: 'biathlon',
-    label: 'leq',
-    limit: 20,
+    category: 'biathlon', label: 'leq', limit: 20,
   },
   {
     id: 'foot-leq',
     urls: [
-      'AO:https://www.lequipe.fr/rss/actu-hebdo_Football.xml',
-      'RSSJ:https://www.lequipe.fr/rss/actu-hebdo_Football.xml',
-      'AO:https://www.lequipe.fr/Xml/Football/Titres/actu_rss.xml',
-      'https://www.lequipe.fr/rss/actu-hebdo_Football.xml',
-      'https://news.google.com/rss/search?q=ligue+1+football+france&hl=fr&gl=FR&ceid=FR:fr',
+      'https://dwh.lequipe.fr/api/edito/rss?path=/Football/',
+      'AO:https://dwh.lequipe.fr/api/edito/rss?path=/Football/',
+      'RSSJ:https://dwh.lequipe.fr/api/edito/rss?path=/Football/',
     ],
-    category: 'foot',
-    label: 'leq',
-    limit: 15,
+    category: 'foot', label: 'leq', limit: 25,
   },
   {
     id: 'foot-fm',
     urls: [
+      'https://www.footmercato.net/club/fc-barcelone/rss',
       'AO:https://www.footmercato.net/club/fc-barcelone/rss',
       'RSSJ:https://www.footmercato.net/club/fc-barcelone/rss',
-      'AO:https://www.footmercato.net/rss.xml',
-      'https://www.footmercato.net/club/fc-barcelone/rss',
-      'https://news.google.com/rss/search?q=fc+barcelone+mercato+transfert&hl=fr&gl=FR&ceid=FR:fr',
     ],
-    category: 'foot',
-    label: 'fm',
-    limit: 15,
+    category: 'foot', label: 'fm', limit: 15,
   },
 ];
 
