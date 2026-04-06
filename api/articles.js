@@ -9,7 +9,8 @@ const parser = new Parser({
     'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.8',
     'Cache-Control': 'no-cache',
   },
-  customFields: { item: [['content:encoded', 'contentFull'], 'category'] },
+  // typeAcces et payant : champs custom L'Équipe pour détecter les articles premium
+  customFields: { item: [['content:encoded', 'contentFull'], 'category', 'typeAcces', 'payant'] },
 });
 
 // ── Sources RSS ───────────────────────────────────────────────
@@ -53,23 +54,43 @@ const SOURCES = [
   },
   {
     id: 'foot-fm',
+    // Footmercato n'a pas de feed par club — on utilise le flux général et on filtre côté serveur
     urls: [
-      'https://www.footmercato.net/club/fc-barcelone/rss',
-      'AO:https://www.footmercato.net/club/fc-barcelone/rss',
-      'RSSJ:https://www.footmercato.net/club/fc-barcelone/rss',
+      'https://www.footmercato.net/flux-rss',
+      'AO:https://www.footmercato.net/flux-rss',
+      'RSSJ:https://www.footmercato.net/flux-rss',
     ],
     category: 'foot', label: 'fm', limit: 15,
+    // Filtre : ne garder que les articles mentionnant le Barça
+    filter: (item) => {
+      const t = (item.title || '').toLowerCase();
+      const l = (item.link  || '').toLowerCase();
+      return t.includes('barca') || t.includes('barcelon') || l.includes('barca') || l.includes('barcelon');
+    },
   },
 ];
 
 // ── Filtre articles abonnés L'Équipe ──────────────────────────
-function isPremium(item) {
+// Vérification terrain : les articles premium dans le RSS L'Équipe ont une description
+// VIDE (uniquement une image CDATA, aucun texte). Les articles gratuits ont toujours
+// un extrait texte. C'est le seul marqueur fiable dans ce flux.
+function isPremium(item, sourceId) {
+  // Pour les sources non-L'Équipe, pas de filtre premium
+  if (sourceId && !sourceId.startsWith('f1') && !sourceId.startsWith('biathlon') && !sourceId.startsWith('foot-leq')) {
+    return false;
+  }
+  // Description vide = article réservé aux abonnés
+  const snippet = (item.contentSnippet || '').trim();
+  const content = (item.contentFull    || '').trim();
+  const hasText = snippet.length > 10 || content.replace(/<[^>]+>/g, '').trim().length > 10;
+  if (!hasText) return true;
+
+  // Sécurité : patterns explicites au cas où L'Équipe change son format
   const title = (item.title || '').toLowerCase();
-  const cats = (item.categories || []).map((c) => String(c).toLowerCase());
+  const cats  = (item.categories || []).map((c) => String(c).toLowerCase());
   return (
-    title.includes('abonnés') ||
-    title.includes('réservé') ||
-    title.includes('🔒') ||
+    title.includes('abonnés') || title.includes('[abonné') ||
+    title.includes('réservé') || title.includes('🔒') ||
     cats.some((c) => c.includes('abonné') || c === 'premium')
   );
 }
@@ -154,7 +175,8 @@ async function fetchSource(src) {
       return {
         category: src.category,
         items: rawItems
-          .filter((item) => !isPremium(item))
+          .filter((item) => !isPremium(item, src.id))
+          .filter((item) => !src.filter || src.filter(item))
           .slice(0, src.limit)
           .map((item) => ({
             id: makeId(item.link || item.guid || item.title || String(Math.random())),
