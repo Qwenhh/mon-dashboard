@@ -1,82 +1,56 @@
-// api/football.js — Scores et matchs via api-football.com (api-sports.io)
-// Free tier : pas de param last/next → on filtre par plage de dates
-// Cache 2h → 3 équipes × 2 calls × 12 = 72 req/jour (< 100 limit)
+// api/football.js — Scores et matchs via football-data.org
+// Free tier : 10 req/min, couvre L1 (Monaco) et PD/CL (Barça)
+// Cache 5min → bien en dessous de la limite
 module.exports = async function handler(req, res) {
-  res.setHeader('Cache-Control', 's-maxage=7200, stale-while-revalidate=300');
+  res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
 
   const { team } = req.query;
-  const key = process.env.API_FOOTBALL_KEY;
-  if (!key) return res.status(500).json({ error: 'API_FOOTBALL_KEY manquante dans Vercel' });
+  const key = process.env.FOOTBALL_DATA_KEY;
+  if (!key) return res.status(500).json({ error: 'FOOTBALL_DATA_KEY manquante dans Vercel' });
 
   const TEAMS = {
-    monaco: { id: 91  },
-    barce:  { id: 529 },
-    reims:  { id: 97  },
+    monaco: { id: 548 },
+    barce:  { id: 81  },
+    france: { id: 773 },
   };
 
   const cfg = TEAMS[team];
   if (!cfg) return res.status(400).json({ error: `Équipe inconnue: ${team}` });
 
-  const headers = { 'x-apisports-key': key };
-  const BASE    = 'https://v3.football.api-sports.io';
-  const teamId  = cfg.id;
+  const headers  = { 'X-Auth-Token': key };
+  const BASE     = 'https://api.football-data.org/v4';
+  const teamId   = cfg.id;
 
-  // Saison courante : août = début de saison
-  const now    = new Date();
-  const season = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1;
-
-  // Plages de dates
-  const fmt = (d) => d.toISOString().split('T')[0];
-  const today     = fmt(now);
-  const past60    = fmt(new Date(now - 60 * 864e5));
-  const future60  = fmt(new Date(now + 60 * 864e5));
-
-  function computeMatchInfo(fixture) {
-    const isHome = Number(fixture.teams?.home?.id) === Number(teamId);
+  function computeMatchInfo(match) {
+    const isHome = Number(match.homeTeam?.id) === Number(teamId);
     return {
       isHome,
-      opponent   : isHome ? (fixture.teams?.away?.name || '?') : (fixture.teams?.home?.name || '?'),
-      myScore    : isHome ? (fixture.goals?.home ?? null) : (fixture.goals?.away ?? null),
-      oppScore   : isHome ? (fixture.goals?.away ?? null) : (fixture.goals?.home ?? null),
-      utcDate    : fixture.fixture?.date || null,
-      competition: fixture.league?.name || '',
+      opponent   : isHome ? (match.awayTeam?.shortName || match.awayTeam?.name || '?') : (match.homeTeam?.shortName || match.homeTeam?.name || '?'),
+      myScore    : isHome ? (match.score?.fullTime?.home ?? null) : (match.score?.fullTime?.away ?? null),
+      oppScore   : isHome ? (match.score?.fullTime?.away ?? null) : (match.score?.fullTime?.home ?? null),
+      utcDate    : match.utcDate || null,
+      competition: match.competition?.name || '',
     };
   }
 
   try {
     const [lastRes, nextRes] = await Promise.all([
-      // Matchs terminés des 60 derniers jours
-      fetch(`${BASE}/fixtures?team=${teamId}&season=${season}&status=FT&from=${past60}&to=${today}`, { headers, signal: AbortSignal.timeout(8000) }),
-      // Matchs à venir dans les 60 prochains jours
-      fetch(`${BASE}/fixtures?team=${teamId}&season=${season}&from=${today}&to=${future60}`, { headers, signal: AbortSignal.timeout(8000) }),
+      fetch(`${BASE}/teams/${teamId}/matches?status=FINISHED&limit=1`, { headers, signal: AbortSignal.timeout(8000) }),
+      fetch(`${BASE}/teams/${teamId}/matches?status=SCHEDULED&limit=1`, { headers, signal: AbortSignal.timeout(8000) }),
     ]);
 
     const [lastData, nextData] = await Promise.all([lastRes.json(), nextRes.json()]);
 
-    const lastFixtures = lastData.response || [];
-    const nextFixtures = (nextData.response || []).filter(f =>
-      ['NS', 'TBD', '1H', '2H', 'HT', 'ET', 'BT', 'P', 'SUSP', 'INT', 'LIVE'].includes(f.fixture?.status?.short)
-    );
+    const lastMatches = lastData.matches || [];
+    const nextMatches = nextData.matches || [];
 
-    // Dernier match joué = dernier de la liste triée par date
-    const lastFixture = lastFixtures.length ? lastFixtures[lastFixtures.length - 1] : null;
-    // Prochain match = premier à venir
-    const nextFixture = nextFixtures.length ? nextFixtures[0] : null;
+    const lastMatch = lastMatches.length ? lastMatches[lastMatches.length - 1] : null;
+    const nextMatch = nextMatches.length ? nextMatches[0] : null;
 
     res.status(200).json({
       teamId,
-      last: lastFixture ? computeMatchInfo(lastFixture) : null,
-      next: nextFixture ? computeMatchInfo(nextFixture) : null,
-      _debug: {
-        season,
-        past60, today, future60,
-        lastErrors: lastData.errors,
-        lastResults: lastData.results,
-        nextErrors: nextData.errors,
-        nextResults: nextData.results,
-        lastSample: lastFixtures.slice(-2).map(f => ({ date: f.fixture?.date, status: f.fixture?.status?.short })),
-        nextSample: nextFixtures.slice(0, 2).map(f => ({ date: f.fixture?.date, status: f.fixture?.status?.short })),
-      },
+      last: lastMatch ? computeMatchInfo(lastMatch) : null,
+      next: nextMatch ? computeMatchInfo(nextMatch) : null,
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
