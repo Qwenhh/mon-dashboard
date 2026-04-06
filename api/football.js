@@ -39,6 +39,12 @@ module.exports = async function handler(req, res) {
       fetch(`${BASE}/teams/${teamId}/matches?status=SCHEDULED&limit=1`, { headers, signal: AbortSignal.timeout(8000) }),
     ]);
 
+    // Si rate limit → on ne met pas en cache pour réessayer vite
+    if (lastRes.status === 429 || nextRes.status === 429) {
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(429).json({ error: 'Rate limit football-data.org — réessaie dans une minute.' });
+    }
+
     const [lastData, nextData] = await Promise.all([lastRes.json(), nextRes.json()]);
 
     const lastMatches = lastData.matches || [];
@@ -53,13 +59,6 @@ module.exports = async function handler(req, res) {
       teamId,
       last: lastMatch ? computeMatchInfo(lastMatch) : null,
       next: nextMatch ? computeMatchInfo(nextMatch) : null,
-      _debug: {
-        lastCount: lastMatches.length,
-        nextCount: nextMatches.length,
-        lastError: lastData.errorCode || lastData.message || null,
-        nextError: nextData.errorCode || nextData.message || null,
-        lastSample: lastMatches.slice(-1).map(m => ({ date: m.utcDate, status: m.status, home: m.homeTeam?.name, away: m.awayTeam?.name })),
-      },
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
