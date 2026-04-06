@@ -191,7 +191,7 @@
     <div class="teams-row">
       <div class="team-card" id="team-monaco"><div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">AS Monaco</span></div><div class="widget-sub">Chargement…</div></div>
       <div class="team-card" id="team-barce"><div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">FC Barcelone</span></div><div class="widget-sub">Chargement…</div></div>
-      <div class="team-card" id="team-reims"><div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">Stade de Reims</span></div><div class="widget-sub">Chargement…</div></div>
+      <div class="team-card" id="team-france"><div class="team-header"><span style="font-size:1.3rem">🇫🇷</span><span class="team-name">Équipe de France</span></div><div class="widget-sub">Chargement…</div></div>
     </div>
 
     <div class="section-divider">Articles à lire</div>
@@ -538,7 +538,7 @@ async function loadF1GP() {
 const TEAMS=[
   {teamKey:'monaco', displayName:'AS Monaco',      id:'team-monaco'},
   {teamKey:'barce',  displayName:'FC Barcelone',   id:'team-barce'},
-  {teamKey:'reims',  displayName:'Stade de Reims', id:'team-reims'},
+  {teamKey:'france', displayName:'Équipe de France', id:'team-france'},
 ];
 function frDate(iso){ if(!iso)return''; const dt=new Date(iso); return dt.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',timeZone:'Europe/Paris'})+' · '+dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Paris'}); }
 async function loadTeam({teamKey,displayName,id}){
