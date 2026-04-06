@@ -67,6 +67,16 @@ module.exports = async function handler(req, res) {
       teamId,
       last: lastFixture ? computeMatchInfo(lastFixture) : null,
       next: nextFixture ? computeMatchInfo(nextFixture) : null,
+      _debug: {
+        season,
+        past60, today, future60,
+        lastErrors: lastData.errors,
+        lastResults: lastData.results,
+        nextErrors: nextData.errors,
+        nextResults: nextData.results,
+        lastSample: lastFixtures.slice(-2).map(f => ({ date: f.fixture?.date, status: f.fixture?.status?.short })),
+        nextSample: nextFixtures.slice(0, 2).map(f => ({ date: f.fixture?.date, status: f.fixture?.status?.short })),
+      },
     });
   } catch (e) {
     res.status(500).json({ error: e.message });
