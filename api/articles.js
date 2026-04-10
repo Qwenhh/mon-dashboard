@@ -50,7 +50,7 @@ const SOURCES = [
       'AO:https://dwh.lequipe.fr/api/edito/rss?path=/Football/',
       'RSSJ:https://dwh.lequipe.fr/api/edito/rss?path=/Football/',
     ],
-    category: 'foot', label: 'leq', limit: 25,
+    category: 'foot', label: 'leq', limit: 50,
   },
   {
     id: 'foot-fm',
