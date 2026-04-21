@@ -63,9 +63,15 @@ const SOURCES = [
     category: 'foot', label: 'fm', limit: 15,
     // Filtre : ne garder que les articles mentionnant le Barça
     filter: (item) => {
-      const t = (item.title || '').toLowerCase();
-      const l = (item.link  || '').toLowerCase();
-      return t.includes('barca') || t.includes('barcelon') || l.includes('barca') || l.includes('barcelon');
+      const t    = (item.title || '').toLowerCase();
+      const l    = (item.link  || '').toLowerCase();
+      const cats = (item.categories || []).map((c) => String(c).toLowerCase());
+      // La balise <category> du flux contient "FC Barcelone" / "BAR" — source la plus fiable
+      return (
+        cats.some((c) => c.includes('barcelon') || c === 'bar') ||
+        t.includes('barca') || t.includes('barcelon') ||
+        l.includes('barca') || l.includes('barcelon')
+      );
     },
   },
 ];
