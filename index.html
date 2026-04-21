@@ -202,14 +202,14 @@
       <div class="home-card" data-goto="foot"><div class="home-card-icon">⚽</div><div class="home-card-title">Football</div><div class="home-card-sub">L'Équipe · Foot Mercato</div><div class="home-card-count" id="home-count-foot">…</div><div class="home-card-label">non lus</div><div class="home-preview" id="home-preview-foot"></div></div>
     </div>
 
-    <div class="refresh-row"><div class="dot-live"></div>Mise à jour : <strong id="last-update">--:--</strong></div>
+    <div class="refresh-row"><div class="dot-live"></div>Mise à jour : <strong id="last-update">--:--</strong><span id="sync-status"></span></div>
   </div>
 </div>
 
 <!-- FUN -->
 <div class="page" id="page-fun">
   <div class="articles-page fun-tab">
-    <div class="mark-all-row"><button class="btn-mark-all" onclick="markAllRead(['fun'])">Tout marquer comme lu</button></div>
+    <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-fun" onclick="markAllToggle(['fun'])">Tout marquer comme lu</button></div>
     <div id="list-fun"><div class="loading-msg">Chargement…</div></div>
   </div>
 </div>
@@ -217,7 +217,7 @@
 <!-- F1 -->
 <div class="page" id="page-f1">
   <div class="articles-page">
-    <div class="mark-all-row"><button class="btn-mark-all" onclick="markAllRead(['f1'])">Tout marquer comme lu</button></div>
+    <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-f1" onclick="markAllToggle(['f1'])">Tout marquer comme lu</button></div>
     <div id="list-f1"><div class="loading-msg">Chargement…</div></div>
   </div>
 </div>
@@ -225,7 +225,7 @@
 <!-- BIATHLON -->
 <div class="page" id="page-biathlon">
   <div class="articles-page">
-    <div class="mark-all-row"><button class="btn-mark-all" onclick="markAllRead(['biathlon'])">Tout marquer comme lu</button></div>
+    <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-biathlon" onclick="markAllToggle(['biathlon'])">Tout marquer comme lu</button></div>
     <div id="list-biathlon"><div class="loading-msg">Chargement…</div></div>
   </div>
 </div>
@@ -233,7 +233,7 @@
 <!-- FOOT -->
 <div class="page" id="page-foot">
   <div class="articles-page">
-    <div class="mark-all-row"><button class="btn-mark-all" onclick="markAllRead(['foot'])">Tout marquer comme lu</button></div>
+    <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-foot" onclick="markAllToggle(['foot'])">Tout marquer comme lu</button></div>
     <div id="list-foot"><div class="loading-msg">Chargement…</div></div>
   </div>
 </div>
@@ -259,7 +259,7 @@
 let articles = { fun:[], f1:[], biathlon:[], foot:[] };
 let readIds  = new Set();
 
-/* ══ TEMPS RELATIF ══ */
+/* ══ TEMPS RELATIF + DATE ══ */
 function relTime(iso) {
   const diff = Date.now() - new Date(iso).getTime();
   const m = Math.floor(diff/60000);
@@ -269,9 +269,23 @@ function relTime(iso) {
   if (h < 24) return `il y a ${h}h`;
   return `il y a ${Math.floor(h/24)}j`;
 }
+function pubDate(iso) {
+  const d = new Date(iso);
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' · ' +
+         d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+}
 
 /* ══ READ STATUS (localStorage + Supabase via /api/read) ══ */
 const LS_KEY = 'dashboard_readIds';
+let supabaseOk = true;
+
+function renderSyncStatus() {
+  const el = document.getElementById('sync-status');
+  if (!el) return;
+  el.innerHTML = supabaseOk
+    ? ''
+    : ' · <span style="color:#e04a6d;font-size:.68rem" title="Supabase indisponible, données sauvegardées localement">⚠️ Hors ligne</span>';
+}
 
 function lsLoad() {
   try { return new Set(JSON.parse(localStorage.getItem(LS_KEY) || '[]')); } catch { return new Set(); }
@@ -292,9 +306,12 @@ async function fetchReadStatus() {
     // Sync vers Supabase les IDs présents localement mais pas en base
     local.filter(id => !remote.includes(id)).forEach(id => syncRead(id, 'mark'));
     lsSave();
+    supabaseOk = true;
   } catch(e) {
+    supabaseOk = false;
     console.warn('Supabase indisponible, localStorage utilisé comme fallback:', e);
   }
+  renderSyncStatus();
 }
 
 function syncRead(id, action) {
@@ -315,11 +332,12 @@ function toggleRead(cat, id, e) {
   if (modalState.id === id) syncModalReadBtn();
 }
 
-function markAllRead(cats) {
-  cats.forEach(cat => {
-    (articles[cat] || []).forEach(a => {
-      if (!readIds.has(a.id)) { readIds.add(a.id); syncRead(a.id, 'mark'); }
-    });
+function markAllToggle(cats) {
+  const all = cats.flatMap(c => articles[c] || []);
+  const allRead = all.length > 0 && all.every(a => readIds.has(a.id));
+  all.forEach(a => {
+    if (allRead) { readIds.delete(a.id); syncRead(a.id, 'unmark'); }
+    else if (!readIds.has(a.id)) { readIds.add(a.id); syncRead(a.id, 'mark'); }
   });
   lsSave();
   renderAll();
@@ -337,7 +355,6 @@ async function loadArticles() {
     });
     return;
   }
-  renderAll();
 }
 
 /* ══ RENDER ARTICLES ══ */
@@ -358,7 +375,7 @@ function renderList(containerId, cats) {
     const text = a.title || a.content || '';
     return `<div class="article-card ${read?'read':''}" onclick="openModal('${a.id}')">
       <div class="article-main">
-        <div class="article-source-row">${tagHtml(a)}<span class="article-time">${relTime(a.date)}</span></div>
+        <div class="article-source-row">${tagHtml(a)}<span class="article-time">${relTime(a.date)}</span><span class="article-time" style="margin-left:auto;opacity:.6">${pubDate(a.date)}</span></div>
         <div class="article-text">${text}</div>
       </div>
       <button class="read-action" onclick="toggleRead('${a.category}','${a.id}',event)" title="Marquer comme lu">
@@ -391,6 +408,17 @@ function renderHomePreviews() {
   });
 }
 
+function renderMarkAllBtns() {
+  const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'] };
+  Object.entries(g).forEach(([k, cats]) => {
+    const btn = document.getElementById('btn-markall-' + k);
+    if (!btn) return;
+    const all = cats.flatMap(c => articles[c] || []);
+    const allRead = all.length > 0 && all.every(a => readIds.has(a.id));
+    btn.textContent = allRead ? 'Tout démarquer' : 'Tout marquer comme lu';
+  });
+}
+
 function renderAll() {
   renderList('list-fun',      ['fun']);
   renderList('list-f1',       ['f1']);
@@ -398,6 +426,7 @@ function renderAll() {
   renderList('list-foot',     ['foot']);
   renderBadges();
   renderHomePreviews();
+  renderMarkAllBtns();
 }
 
 /* ══ MODAL ══ */
@@ -591,7 +620,7 @@ async function loadTeam({teamKey,displayName,id}){
 }
 
 /* ══ INIT ══ */
-function updateClock(){ document.getElementById('last-update').textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); }
+function updateClock(){ document.getElementById('last-update').textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); renderAll(); }
 updateClock(); setInterval(updateClock,60000);
 
 Promise.allSettled([fetchReadStatus(), loadArticles()]).then(renderAll);
