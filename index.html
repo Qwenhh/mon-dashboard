@@ -403,8 +403,10 @@ function renderBadges() {
   const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'], fm:['fm'] };
   Object.entries(g).forEach(([k,cats]) => {
     const n = unreadCount(cats);
-    document.getElementById('tbadge-'+k).textContent = n;
-    document.getElementById('home-count-'+k).textContent = n;
+    const badge = document.getElementById('tbadge-'+k);
+    const count = document.getElementById('home-count-'+k);
+    if (badge) badge.textContent = n;
+    if (count) count.textContent = n;
   });
 }
 
