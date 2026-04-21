@@ -60,7 +60,7 @@ const SOURCES = [
       'AO:https://www.footmercato.net/flux-rss',
       'RSSJ:https://www.footmercato.net/flux-rss',
     ],
-    category: 'foot', label: 'fm', limit: 15,
+    category: 'fm', label: 'fm', limit: 15,
     // Filtre : ne garder que les articles mentionnant le Barça
     filter: (item) => {
       const t    = (item.title || '').toLowerCase();
@@ -230,7 +230,7 @@ module.exports = async function handler(req, res) {
   }
 
   // Toujours renvoyer toutes les catégories même vides
-  ['fun', 'f1', 'biathlon', 'foot'].forEach(cat => {
+  ['fun', 'f1', 'biathlon', 'foot', 'fm'].forEach(cat => {
     if (!byCategory[cat]) byCategory[cat] = [];
   });
 
