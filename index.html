@@ -270,13 +270,30 @@ function relTime(iso) {
   return `il y a ${Math.floor(h/24)}j`;
 }
 
-/* ══ READ STATUS (Supabase via /api/read) ══ */
+/* ══ READ STATUS (localStorage + Supabase via /api/read) ══ */
+const LS_KEY = 'dashboard_readIds';
+
+function lsLoad() {
+  try { return new Set(JSON.parse(localStorage.getItem(LS_KEY) || '[]')); } catch { return new Set(); }
+}
+function lsSave() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify([...readIds])); } catch {}
+}
+
 async function fetchReadStatus() {
+  // Chargement instantané depuis localStorage (pas d'attente réseau)
+  readIds = lsLoad();
   try {
-    const d = await fetch('/api/read').then(r=>r.json());
-    readIds = new Set(d.read || []);
+    const d = await fetch('/api/read').then(r => r.json());
+    const remote = d.read || [];
+    const local = [...readIds];
+    // Fusion : union localStorage + Supabase
+    remote.forEach(id => readIds.add(id));
+    // Sync vers Supabase les IDs présents localement mais pas en base
+    local.filter(id => !remote.includes(id)).forEach(id => syncRead(id, 'mark'));
+    lsSave();
   } catch(e) {
-    console.warn('Statut lu indisponible:', e);
+    console.warn('Supabase indisponible, localStorage utilisé comme fallback:', e);
   }
 }
 
@@ -285,13 +302,14 @@ function syncRead(id, action) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ articleId: id, action }),
-  }).catch(console.warn);
+  }).catch(e => console.warn('Sync Supabase échouée (localStorage conservé):', e));
 }
 
 function toggleRead(cat, id, e) {
   if (e) e.stopPropagation();
   const wasRead = readIds.has(id);
   if (wasRead) readIds.delete(id); else readIds.add(id);
+  lsSave();
   syncRead(id, wasRead ? 'unmark' : 'mark');
   renderAll();
   if (modalState.id === id) syncModalReadBtn();
@@ -303,6 +321,7 @@ function markAllRead(cats) {
       if (!readIds.has(a.id)) { readIds.add(a.id); syncRead(a.id, 'mark'); }
     });
   });
+  lsSave();
   renderAll();
 }
 
