@@ -71,21 +71,24 @@ const SOURCES = [
 ];
 
 // ── Filtre articles abonnés L'Équipe ──────────────────────────
-// Vérification terrain : les articles premium dans le RSS L'Équipe ont une description
-// VIDE (uniquement une image CDATA, aucun texte). Les articles gratuits ont toujours
-// un extrait texte. C'est le seul marqueur fiable dans ce flux.
 function isPremium(item, sourceId) {
-  // Pour les sources non-L'Équipe, pas de filtre premium
   if (sourceId && !sourceId.startsWith('f1') && !sourceId.startsWith('biathlon') && !sourceId.startsWith('foot-leq')) {
     return false;
   }
-  // Description vide = article réservé aux abonnés
+
+  // Champs custom XML L'Équipe — source la plus fiable
+  const typeAcces = (item.typeAcces || '').toLowerCase();
+  const payant    = (item.payant    || '').toLowerCase();
+  if (typeAcces && typeAcces !== 'gratuit' && typeAcces !== 'free') return true;
+  if (payant === 'true' || payant === '1') return true;
+
+  // Fallback : description vide = article réservé aux abonnés
   const snippet = (item.contentSnippet || '').trim();
   const content = (item.contentFull    || '').trim();
   const hasText = snippet.length > 10 || content.replace(/<[^>]+>/g, '').trim().length > 10;
   if (!hasText) return true;
 
-  // Sécurité : patterns explicites au cas où L'Équipe change son format
+  // Fallback : patterns dans le titre ou les catégories
   const title = (item.title || '').toLowerCase();
   const cats  = (item.categories || []).map((c) => String(c).toLowerCase());
   return (
