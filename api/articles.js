@@ -60,8 +60,9 @@ const SOURCES = [
       'AO:https://www.footmercato.net/flux-rss',
       'RSSJ:https://www.footmercato.net/flux-rss',
     ],
-    category: 'fm', label: 'fm', limit: 15,
-    // Filtre : ne garder que les articles mentionnant le Barça
+    category: 'fm', label: 'fm', limit: 30,
+    supplement: scrapeFootmercatoBarcelone,
+    // Filtre RSS : ne garder que les articles Barça du flux général
     filter: (item) => {
       const t    = (item.title || '').toLowerCase();
       const l    = (item.link  || '').toLowerCase();
@@ -159,53 +160,131 @@ async function fetchViaRss2Json(rssUrl, limit) {
   }));
 }
 
+// ── Scraping page club Footmercato (Barcelone) ───────────────
+function parseFmDate(str) {
+  const now = new Date();
+  const timeMatch = str.match(/^(\d{1,2}):(\d{2})/);
+  if (timeMatch) {
+    // Heure Paris (CEST = UTC+2 en avril)
+    const candidate = new Date(now);
+    candidate.setUTCHours(parseInt(timeMatch[1]) - 2, parseInt(timeMatch[2]), 0, 0);
+    if (candidate > now) candidate.setUTCDate(candidate.getUTCDate() - 1);
+    return candidate.toISOString();
+  }
+  const dateMatch = str.match(/^(\d{1,2})\/(\d{1,2})/);
+  if (dateMatch) {
+    const d = new Date(now);
+    d.setMonth(parseInt(dateMatch[2]) - 1, parseInt(dateMatch[1]));
+    d.setUTCHours(10, 0, 0, 0);
+    return d.toISOString();
+  }
+  return new Date(Date.now() - 3600000).toISOString();
+}
+
+async function scrapeFootmercatoBarcelone() {
+  const url = 'https://www.footmercato.net/club/fc-barcelone/actualite';
+  const res = await fetch(url, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(15000) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const html = await res.text();
+
+  const items = [];
+  const blockRegex = /<article class="articleInline[^"]*"[^>]*>[\s\S]*?<\/article>/g;
+  let block;
+  while ((block = blockRegex.exec(html)) !== null) {
+    const b = block[0];
+    const linkMatch = b.match(/href="(https:\/\/www\.footmercato\.net\/a\d+[^"]+)"/);
+    if (!linkMatch) continue;
+    const titleMatch = b.match(/<h3 class="articleTitleMetas__title[^>]*>\s*([\s\S]*?)\s*<\/h3>/);
+    if (!titleMatch) continue;
+    const dateMatch = b.match(/<li class="articleTitleMetas__competitionDate">([^<]+)<\/li>/);
+    items.push({
+      link: linkMatch[1],
+      title: titleMatch[1].replace(/\s+/g, ' ').trim(),
+      isoDate: parseFmDate(dateMatch ? dateMatch[1].trim() : ''),
+      contentSnippet: '',
+    });
+  }
+  console.log(`✓ scrape footmercato barcelone (${items.length} items)`);
+  return items;
+}
+
 // ── Essaie chaque URL jusqu'à ce qu'une fonctionne ───────────
 // Préfixes spéciaux :
 //   "AO:"   → proxy allorigins.win
 //   "RSSJ:" → proxy rss2json
 async function fetchSource(src) {
+  let rssItems = [];
   let lastError;
+
   for (const url of src.urls) {
     try {
-      let rawItems;
       if (url.startsWith('AO:')) {
-        rawItems = await fetchViaAllOrigins(url.slice(3));
+        rssItems = await fetchViaAllOrigins(url.slice(3));
       } else if (url.startsWith('RSSJ:')) {
-        rawItems = await fetchViaRss2Json(url.slice(5), src.limit);
+        // Si filtre actif, récupérer plus d'items avant filtrage
+        const fetchLimit = src.filter ? Math.min(src.limit * 5, 100) : src.limit;
+        rssItems = await fetchViaRss2Json(url.slice(5), fetchLimit);
       } else {
-        // Fetch direct avec fixXml pour corriger le XML malformé
         const rawRes = await fetch(url, { headers: FETCH_HEADERS, signal: AbortSignal.timeout(12000) });
         if (!rawRes.ok) throw new Error(`HTTP ${rawRes.status}`);
         const rawXml = await rawRes.text();
         const feed = await parser.parseString(fixXml(rawXml));
-        rawItems = feed.items;
-        console.log(`✓ ${src.id} → ${url} (${rawItems.length} items)`);
+        rssItems = feed.items;
+        console.log(`✓ ${src.id} → ${url} (${rssItems.length} items)`);
       }
-      return {
-        category: src.category,
-        items: rawItems
-          .filter((item) => !isPremium(item, src.id))
-          .filter((item) => !src.filter || src.filter(item))
-          .slice(0, src.limit)
-          .map((item) => ({
-            id: makeId(item.link || item.guid || item.title || String(Math.random())),
-            title: strip(item.title || ''),
-            link: item.link || '',
-            date: item.isoDate || item.pubDate || new Date().toISOString(),
-            content: strip(
-              item.contentFull || item.contentSnippet || item.content || item.summary || ''
-            ).slice(0, 800),
-            source: src.id,
-            label: src.label,
-            category: src.category,
-          })),
-      };
+      break; // succès, on arrête d'essayer
     } catch (e) {
       console.warn(`✗ ${src.id} → ${url}: ${e.message}`);
       lastError = e;
     }
   }
-  throw lastError || new Error(`Toutes les URLs ont échoué pour ${src.id}`);
+
+  // Filtrage RSS
+  const filteredRss = rssItems
+    .filter((item) => !isPremium(item, src.id))
+    .filter((item) => !src.filter || src.filter(item));
+
+  // Scraping supplémentaire
+  let supplementItems = [];
+  if (src.supplement) {
+    try {
+      supplementItems = await src.supplement();
+    } catch (e) {
+      console.warn(`✗ supplement ${src.id}: ${e.message}`);
+    }
+  }
+
+  if (!filteredRss.length && !supplementItems.length && lastError) {
+    throw lastError;
+  }
+
+  // Fusion et dédoublonnage par lien
+  const seen = new Set();
+  const merged = [];
+  for (const item of [...filteredRss, ...supplementItems]) {
+    const key = item.link || item.guid || item.title;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    merged.push(item);
+  }
+
+  merged.sort((a, b) => new Date(b.isoDate || b.pubDate || 0) - new Date(a.isoDate || a.pubDate || 0));
+
+  return {
+    category: src.category,
+    items: merged.slice(0, src.limit).map((item) => ({
+      id: makeId(item.link || item.guid || item.title || String(Math.random())),
+      title: strip(item.title || ''),
+      link: item.link || '',
+      date: item.isoDate || item.pubDate || new Date().toISOString(),
+      content: strip(
+        item.contentFull || item.contentSnippet || item.content || item.summary || ''
+      ).slice(0, 800),
+      source: src.id,
+      label: src.label,
+      category: src.category,
+    })),
+  };
 }
 
 // ── Handler ───────────────────────────────────────────────────
