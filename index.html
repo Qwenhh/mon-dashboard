@@ -305,17 +305,17 @@ function lsSave() {
 }
 
 async function fetchReadStatus() {
-  // Affichage instantané depuis le cache local en attendant Supabase
-  readIds = lsLoad();
+  readIds = lsLoad(); // affichage instantané
   try {
     const d = await fetch('/api/read', { signal: AbortSignal.timeout(8000) }).then(r => r.json());
-    // Supabase est la source de vérité — on remplace le cache local
-    readIds = new Set(d.read || []);
+    // Union : localStorage + Supabase (sans re-pousser vers Supabase)
+    // → préserve l'état local si le POST a échoué
+    // → récupère les coches des autres appareils depuis Supabase
+    (d.read || []).forEach(id => readIds.add(id));
     lsSave();
     supabaseOk = true;
   } catch(e) {
     supabaseOk = false;
-    // localStorage reste en fallback si Supabase est injoignable
     console.warn('Supabase indisponible, localStorage utilisé comme fallback:', e);
   }
   renderSyncStatus();
