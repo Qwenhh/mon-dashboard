@@ -305,20 +305,17 @@ function lsSave() {
 }
 
 async function fetchReadStatus() {
-  // Chargement instantané depuis localStorage (pas d'attente réseau)
+  // Affichage instantané depuis le cache local en attendant Supabase
   readIds = lsLoad();
   try {
-    const d = await fetch('/api/read').then(r => r.json());
-    const remote = d.read || [];
-    const local = [...readIds];
-    // Fusion : union localStorage + Supabase
-    remote.forEach(id => readIds.add(id));
-    // Sync vers Supabase les IDs présents localement mais pas en base
-    local.filter(id => !remote.includes(id)).forEach(id => syncRead(id, 'mark'));
+    const d = await fetch('/api/read', { signal: AbortSignal.timeout(8000) }).then(r => r.json());
+    // Supabase est la source de vérité — on remplace le cache local
+    readIds = new Set(d.read || []);
     lsSave();
     supabaseOk = true;
   } catch(e) {
     supabaseOk = false;
+    // localStorage reste en fallback si Supabase est injoignable
     console.warn('Supabase indisponible, localStorage utilisé comme fallback:', e);
   }
   renderSyncStatus();
