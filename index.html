@@ -128,7 +128,7 @@
     .btn-refresh { background: none; border: none; color: var(--muted); font-size: .72rem; cursor: pointer; padding: 0 4px; transition: color .15s; }
     .btn-refresh:hover { color: var(--text); }
     .btn-refresh:disabled { opacity: .4; cursor: default; }
-    .article-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; display: flex; align-items: flex-start; cursor: pointer; transition: border-color .15s, background .15s; overflow: hidden; }
+    .article-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; display: flex; align-items: flex-start; cursor: pointer; transition: border-color .15s, background .15s; overflow: hidden; text-decoration: none; color: inherit; }
     .article-card:hover { border-color: #3e3e55; background: var(--surface2); }
     .article-card.read { opacity: .32; }
     .article-card.read:hover { opacity: .5; }
@@ -376,8 +376,17 @@ async function fetchReadStatus() {
   renderSyncStatus();
 }
 
+function markAndOpen(cat, id) {
+  if (!readIds.has(id)) {
+    readIds.add(id);
+    lsSave();
+    syncRead(id, 'mark');
+    renderAll();
+  }
+}
+
 function toggleRead(cat, id, e) {
-  if (e) e.stopPropagation();
+  if (e) { e.stopPropagation(); e.preventDefault(); }
   const wasRead = readIds.has(id);
   if (wasRead) readIds.delete(id); else readIds.add(id);
   lsSave();
@@ -453,7 +462,12 @@ function renderList(containerId, cats) {
   c.innerHTML = items.map(a => {
     const read = readIds.has(a.id);
     const text = a.title || a.content || '';
-    return `<div class="article-card ${read?'read':''}" onclick="openModal('${a.id}')">
+    const isLink = a.label === 'leq' || a.label === 'fm';
+    const open  = isLink
+      ? `<a class="article-card ${read?'read':''}" href="${a.link}" target="_blank" rel="noopener noreferrer" onclick="markAndOpen('${a.category}','${a.id}')">`
+      : `<div class="article-card ${read?'read':''}" onclick="openModal('${a.id}')">`;
+    const close = isLink ? '</a>' : '</div>';
+    return `${open}
       <div class="article-main">
         <div class="article-source-row">${tagHtml(a)}<span class="article-time">${relTime(a.date)}</span><span class="article-time" style="margin-left:auto;opacity:.6">${pubDate(a.date)}</span></div>
         <div class="article-text">${text}</div>
@@ -461,7 +475,7 @@ function renderList(containerId, cats) {
       <button class="read-action" onclick="toggleRead('${a.category}','${a.id}',event)" title="Marquer comme lu">
         <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
       </button>
-    </div>`;
+    ${close}`;
   }).join('');
 }
 
