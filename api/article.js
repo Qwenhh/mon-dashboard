@@ -53,6 +53,10 @@ function extractArticle(html) {
       if (/la suite après cette publicité/i.test(text)) continue;
       if (/abonnez-vous/i.test(text) && text.length < 60) continue;
       if (/publicité/i.test(text) && text.length < 40) continue;
+      // Marqueurs de fin d'article — tout ce qui suit est recommandations/pub
+      if (/^en savoir plus$/i.test(text)) break;
+      if (/^articles recommandés$/i.test(text)) break;
+      if (/^sur le même sujet$/i.test(text)) break;
 
       parts.push(m[1].toLowerCase() === 'h3' ? `**${text}**` : text);
     }
