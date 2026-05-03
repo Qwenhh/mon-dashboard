@@ -10,7 +10,7 @@
       --text: #e8e8f0; --muted: #6a6a85;
       --accent-fun: #c25e9a; --accent-f1: #e8322b; --accent-biat: #1f8ccd;
       --accent-foot: #27ae60; --accent-home: #7b6cf6;
-      --accent-vdm: #e04a6d; --accent-dtc: #9b6fd4; --accent-fm: #a855f7;
+      --accent-vdm: #e04a6d; --accent-dtc: #9b6fd4; --accent-fm: #a855f7; --accent-fmr: #f59e0b;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
@@ -27,7 +27,8 @@
     .tab[data-tab="f1"].active       { border-bottom-color: var(--accent-f1); }
     .tab[data-tab="biathlon"].active { border-bottom-color: var(--accent-biat); }
     .tab[data-tab="foot"].active     { border-bottom-color: var(--accent-foot); }
-    .tab[data-tab="fm"].active       { border-bottom-color: var(--accent-fm); }
+    .tab[data-tab="fm"].active        { border-bottom-color: var(--accent-fm); }
+    .tab[data-tab="fmr"].active      { border-bottom-color: var(--accent-fmr); }
     .tab-badge { background: var(--surface2); color: var(--muted); font-size: .65rem; padding: 1px 6px; border-radius: 20px; font-weight: 700; min-width: 18px; text-align: center; }
     .tab.active .tab-badge { background: rgba(255,255,255,.08); color: var(--text); }
 
@@ -178,6 +179,7 @@
   <button class="tab" data-tab="biathlon">🎯 Biathlon <span class="tab-badge" id="tbadge-biathlon">…</span></button>
   <button class="tab" data-tab="foot">⚽ L'Équipe <span class="tab-badge" id="tbadge-foot">…</span></button>
   <button class="tab" data-tab="fm">🔵 Footmercato <span class="tab-badge" id="tbadge-fm">…</span></button>
+  <button class="tab" data-tab="fmr">📖 Barça Reader <span class="tab-badge" id="tbadge-fmr">…</span></button>
 </nav>
 
 <!-- ACCUEIL -->
@@ -251,6 +253,14 @@
   <div class="articles-page">
     <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-fm" onclick="markAllToggle(['fm'])">Tout marquer comme lu</button></div>
     <div id="list-fm"><div class="loading-msg">Chargement…</div></div>
+  </div>
+</div>
+
+<!-- FOOTMERCATO READER -->
+<div class="page" id="page-fmr">
+  <div class="articles-page">
+    <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-fmr" onclick="markAllToggle(['fm'])">Tout marquer comme lu</button></div>
+    <div id="list-fmr"><div class="loading-msg">Chargement…</div></div>
   </div>
 </div>
 
@@ -450,7 +460,7 @@ async function refreshAll() {
   if (btn) { btn.disabled = false; btn.textContent = '↻ Rafraîchir'; }
 }
 
-function renderList(containerId, cats) {
+function renderList(containerId, cats, readerMode = false) {
   const c = document.getElementById(containerId);
   if (!c) return;
   let items = cats.flatMap(cat => articles[cat] || []);
@@ -463,10 +473,11 @@ function renderList(containerId, cats) {
   c.innerHTML = items.map(a => {
     const read = readIds.has(a.id);
     const text = a.title || a.content || '';
-    const isLink = a.label === 'leq' || a.label === 'fm';
+    const isLink = !readerMode && (a.label === 'leq' || a.label === 'fm');
+    const clickFn = readerMode ? `openReaderModal('${a.id}')` : `openModal('${a.id}')`;
     const open  = isLink
       ? `<a class="article-card ${read?'read':''}" href="${a.link}" target="_blank" rel="noopener noreferrer" onclick="openInBackground(event,'${a.link}')">`
-      : `<div class="article-card ${read?'read':''}" onclick="openModal('${a.id}')">`;
+      : `<div class="article-card ${read?'read':''}" onclick="${clickFn}">`;
     const close = isLink ? '</a>' : '</div>';
     return `${open}
       <div class="article-main">
@@ -485,7 +496,7 @@ function unreadCount(cats) {
 }
 
 function renderBadges() {
-  const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'], fm:['fm'] };
+  const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'], fm:['fm'], fmr:['fm'] };
   Object.entries(g).forEach(([k,cats]) => {
     const n = unreadCount(cats);
     const badge = document.getElementById('tbadge-'+k);
@@ -506,7 +517,7 @@ function renderHomePreviews() {
 }
 
 function renderMarkAllBtns() {
-  const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'], fm:['fm'] };
+  const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'], fm:['fm'], fmr:['fm'] };
   Object.entries(g).forEach(([k, cats]) => {
     const btn = document.getElementById('btn-markall-' + k);
     if (!btn) return;
@@ -522,6 +533,7 @@ function renderAll() {
   renderList('list-biathlon', ['biathlon']);
   renderList('list-foot',     ['foot']);
   renderList('list-fm',       ['fm']);
+  renderList('list-fmr',      ['fm'], true);
   renderBadges();
   renderHomePreviews();
   renderMarkAllBtns();
@@ -559,6 +571,42 @@ function openModal(id) {
   syncModalReadBtn();
   document.getElementById('modal-overlay').classList.add('open');
   document.body.style.overflow = 'hidden';
+}
+
+async function openReaderModal(id) {
+  const a = Object.values(articles).flat().find(x => x.id === id);
+  if (!a) return;
+  modalState.id = id;
+
+  document.getElementById('modal-tag').className = 'article-source-tag tag-fm';
+  document.getElementById('modal-tag').textContent = 'Foot Mercato';
+  document.getElementById('modal-time').textContent = relTime(a.date);
+  document.getElementById('modal-open-link').href = a.link || '#';
+  document.getElementById('modal-body').innerHTML = '<div class="loading-msg">Chargement de l\'article…</div>';
+
+  syncModalReadBtn();
+  document.getElementById('modal-overlay').classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  try {
+    const data = await fetch('/api/article?url=' + encodeURIComponent(a.link)).then(r => r.json());
+    if (data.error) throw new Error(data.error);
+
+    let html = '';
+    if (data.title) html += `<p style="font-size:1.05rem;font-weight:700;margin-bottom:12px">${data.title}</p>`;
+    if (data.lead)  html += `<p style="font-style:italic;color:var(--muted);margin-bottom:16px;border-left:3px solid var(--accent-fm);padding-left:12px">${data.lead}</p>`;
+    if (data.body) {
+      html += data.body.split('\n\n').filter(Boolean).map(p =>
+        p.startsWith('**') && p.endsWith('**')
+          ? `<h3 style="font-size:.92rem;font-weight:700;margin:14px 0 6px">${p.slice(2,-2)}</h3>`
+          : `<p style="margin-bottom:12px">${p}</p>`
+      ).join('');
+    }
+    if (!html) html = `<div class="error-msg">Contenu non disponible — <a href="${a.link}" target="_blank" style="color:var(--accent-fm)">ouvrir sur Footmercato →</a></div>`;
+    document.getElementById('modal-body').innerHTML = html;
+  } catch(e) {
+    document.getElementById('modal-body').innerHTML = `<div class="error-msg">Impossible de charger l'article : ${e.message}<br><br><a href="${a.link}" target="_blank" style="color:var(--accent-fm)">Ouvrir sur Footmercato →</a></div>`;
+  }
 }
 
 function syncModalReadBtn() {
