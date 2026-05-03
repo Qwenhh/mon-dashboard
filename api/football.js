@@ -12,6 +12,7 @@ module.exports = async function handler(req, res) {
     monaco: { id: 548 },
     barce:  { id: 81  },
     france: { id: 773 },
+    reims:  { id: 532 },
   };
 
   const cfg = TEAMS[team];
