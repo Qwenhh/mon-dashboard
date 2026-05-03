@@ -54,9 +54,9 @@ function extractArticle(html) {
       if (/abonnez-vous/i.test(text) && text.length < 60) continue;
       if (/publicité/i.test(text) && text.length < 40) continue;
       // Marqueurs de fin d'article — tout ce qui suit est recommandations/pub
-      if (/^en savoir plus$/i.test(text)) break;
-      if (/^articles recommandés$/i.test(text)) break;
-      if (/^sur le même sujet$/i.test(text)) break;
+      if (/en savoir plus/i.test(text) && text.length < 50) break;
+      if (/articles recommandés/i.test(text) && text.length < 50) break;
+      if (/sur le même sujet/i.test(text) && text.length < 50) break;
 
       parts.push(m[1].toLowerCase() === 'h3' ? `**${text}**` : text);
     }
@@ -83,7 +83,7 @@ module.exports = async function handler(req, res) {
 
     const article = extractArticle(html);
 
-    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=600');
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=60');
     return res.status(200).json(article);
   } catch (e) {
     return res.status(500).json({ error: e.message });
