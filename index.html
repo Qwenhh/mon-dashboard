@@ -376,13 +376,14 @@ async function fetchReadStatus() {
   renderSyncStatus();
 }
 
-function markAndOpen(cat, id) {
-  if (!readIds.has(id)) {
-    readIds.add(id);
-    lsSave();
-    syncRead(id, 'mark');
-    renderAll();
-  }
+function openInBackground(e, link) {
+  // Sur mobile (touch), laisser le comportement natif du <a>
+  if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+  // Ctrl/Meta/Shift+clic ou clic molette → comportement natif du navigateur
+  if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey) return;
+  e.preventDefault();
+  window.open(link, '_blank', 'noopener,noreferrer');
+  window.focus(); // remet le focus sur le dashboard
 }
 
 function toggleRead(cat, id, e) {
@@ -464,7 +465,7 @@ function renderList(containerId, cats) {
     const text = a.title || a.content || '';
     const isLink = a.label === 'leq' || a.label === 'fm';
     const open  = isLink
-      ? `<a class="article-card ${read?'read':''}" href="${a.link}" target="_blank" rel="noopener noreferrer" onclick="markAndOpen('${a.category}','${a.id}')">`
+      ? `<a class="article-card ${read?'read':''}" href="${a.link}" target="_blank" rel="noopener noreferrer" onclick="openInBackground(event,'${a.link}')">`
       : `<div class="article-card ${read?'read':''}" onclick="openModal('${a.id}')">`;
     const close = isLink ? '</a>' : '</div>';
     return `${open}
