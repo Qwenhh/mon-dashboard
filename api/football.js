@@ -15,6 +15,13 @@ module.exports = async function handler(req, res) {
     reims:  { id: 532 },
   };
 
+  // Mode recherche temporaire : /api/football?search=reims
+  if (req.query.search) {
+    const r = await fetch(`https://api.football-data.org/v4/teams?search=${encodeURIComponent(req.query.search)}`, { headers: { 'X-Auth-Token': key } });
+    const d = await r.json();
+    return res.status(200).json((d.teams || []).map(t => ({ id: t.id, name: t.name, shortName: t.shortName })));
+  }
+
   const cfg = TEAMS[team];
   if (!cfg) return res.status(400).json({ error: `Équipe inconnue: ${team}` });
 
