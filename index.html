@@ -119,9 +119,15 @@
 
     /* ARTICLES */
     .articles-page { max-width: 780px; margin: 0 auto; padding: 16px; }
-    .mark-all-row { display: flex; justify-content: flex-end; margin-bottom: 10px; }
+    .mark-all-row { display: flex; justify-content: flex-end; gap: 6px; margin-bottom: 10px; }
     .btn-mark-all { background: none; border: 1px solid var(--border); color: var(--muted); font-size: .72rem; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: background .15s, color .15s; }
     .btn-mark-all:hover { background: var(--surface2); color: var(--text); }
+    .btn-unread-filter { background: none; border: 1px solid var(--border); color: var(--muted); font-size: .72rem; padding: 4px 12px; border-radius: 20px; cursor: pointer; transition: background .15s, color .15s; }
+    .btn-unread-filter:hover { background: var(--surface2); color: var(--text); }
+    .btn-unread-filter.active { background: rgba(123,108,246,.12); color: var(--accent-home); border-color: rgba(123,108,246,.35); }
+    .btn-refresh { background: none; border: none; color: var(--muted); font-size: .72rem; cursor: pointer; padding: 0 4px; transition: color .15s; }
+    .btn-refresh:hover { color: var(--text); }
+    .btn-refresh:disabled { opacity: .4; cursor: default; }
     .article-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; display: flex; align-items: flex-start; cursor: pointer; transition: border-color .15s, background .15s; overflow: hidden; }
     .article-card:hover { border-color: #3e3e55; background: var(--surface2); }
     .article-card.read { opacity: .32; }
@@ -204,14 +210,14 @@
       <div class="home-card" data-goto="foot"><div class="home-card-icon">⚽</div><div class="home-card-title">Football</div><div class="home-card-sub">L'Équipe · Foot Mercato</div><div class="home-card-count" id="home-count-foot">…</div><div class="home-card-label">non lus</div><div class="home-preview" id="home-preview-foot"></div></div>
     </div>
 
-    <div class="refresh-row"><div class="dot-live"></div>Mise à jour : <strong id="last-update">--:--</strong><span id="sync-status"></span></div>
+    <div class="refresh-row"><div class="dot-live"></div>Mise à jour : <strong id="last-update">--:--</strong><span id="sync-status"></span> · <button class="btn-refresh" id="btn-refresh" onclick="refreshAll()">↻ Rafraîchir</button></div>
   </div>
 </div>
 
 <!-- FUN -->
 <div class="page" id="page-fun">
   <div class="articles-page fun-tab">
-    <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-fun" onclick="markAllToggle(['fun'])">Tout marquer comme lu</button></div>
+    <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-fun" onclick="markAllToggle(['fun'])">Tout marquer comme lu</button><button class="btn-unread-filter" onclick="toggleUnreadFilter()">Non lus seulement</button></div>
     <div id="list-fun"><div class="loading-msg">Chargement…</div></div>
   </div>
 </div>
@@ -266,8 +272,9 @@
 
 <script>
 /* ══ STATE ══ */
-let articles = { fun:[], f1:[], biathlon:[], foot:[], fm:[] };
-let readIds  = new Set();
+let articles   = { fun:[], f1:[], biathlon:[], foot:[], fm:[] };
+let readIds    = new Set();
+let unreadOnly = false;
 
 /* ══ TEMPS RELATIF + DATE ══ */
 function relTime(iso) {
@@ -411,11 +418,37 @@ function tagHtml(a) {
   return `<span class="article-source-tag ${cls}">${lbl}</span>`;
 }
 
+function toggleUnreadFilter() {
+  unreadOnly = !unreadOnly;
+  document.querySelectorAll('.btn-unread-filter').forEach(btn => {
+    btn.classList.toggle('active', unreadOnly);
+    btn.textContent = unreadOnly ? '✓ Non lus seulement' : 'Non lus seulement';
+  });
+  renderAll();
+}
+
+async function refreshAll() {
+  const btn = document.getElementById('btn-refresh');
+  if (btn) { btn.disabled = true; btn.textContent = '↻…'; }
+  try {
+    const data = await fetch('/api/articles?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json());
+    articles = data;
+  } catch(e) { console.warn('Refresh articles échoué:', e); }
+  await fetchReadStatus();
+  renderAll();
+  updateClock();
+  if (btn) { btn.disabled = false; btn.textContent = '↻ Rafraîchir'; }
+}
+
 function renderList(containerId, cats) {
   const c = document.getElementById(containerId);
   if (!c) return;
-  const items = cats.flatMap(cat => articles[cat] || []);
-  if (!items.length) { c.innerHTML = '<div class="loading-msg">Aucun article disponible.</div>'; return; }
+  let items = cats.flatMap(cat => articles[cat] || []);
+  if (unreadOnly) items = items.filter(a => !readIds.has(a.id));
+  if (!items.length) {
+    c.innerHTML = `<div class="loading-msg">${unreadOnly ? 'Tout est lu 🎉' : 'Aucun article disponible.'}</div>`;
+    return;
+  }
 
   c.innerHTML = items.map(a => {
     const read = readIds.has(a.id);
