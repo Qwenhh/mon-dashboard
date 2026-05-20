@@ -31,6 +31,17 @@
     .tab[data-tab="fmr"].active      { border-bottom-color: var(--accent-fmr); }
     .tab-badge { background: var(--surface2); color: var(--muted); font-size: .65rem; padding: 1px 6px; border-radius: 20px; font-weight: 700; min-width: 18px; text-align: center; }
     .tab.active .tab-badge { background: rgba(255,255,255,.08); color: var(--text); }
+    .btn-theme { margin-left: auto; flex-shrink: 0; background: none; border: none; font-size: 1.1rem; cursor: pointer; padding: 0 10px; align-self: center; opacity: .7; transition: opacity .15s; }
+    .btn-theme:hover { opacity: 1; }
+
+    /* LIGHT MODE */
+    body.light {
+      --bg: #f0f0f5; --surface: #ffffff; --surface2: #f5f5fa; --border: #dddde8;
+      --text: #1a1a2e; --muted: #6a6a88;
+    }
+    body.light .tab.active .tab-badge { background: rgba(0,0,0,.07); }
+    body.light .modal-overlay { background: rgba(0,0,0,.5); }
+    body.light .skeleton { background: linear-gradient(90deg, #e8e8f0 25%, #d8d8e8 50%, #e8e8f0 75%); background-size: 200% 100%; }
 
     /* PAGES */
     .page { display: none; }
@@ -180,6 +191,7 @@
   <button class="tab" data-tab="foot">⚽ L'Équipe <span class="tab-badge" id="tbadge-foot">…</span></button>
   <button class="tab" data-tab="fm">🔵 Footmercato <span class="tab-badge" id="tbadge-fm">…</span></button>
   <button class="tab" data-tab="fmr">📖 Barça Reader <span class="tab-badge" id="tbadge-fmr">…</span></button>
+  <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Basculer mode clair/sombre">☀️</button>
 </nav>
 
 <!-- ACCUEIL -->
@@ -281,6 +293,20 @@
 </div>
 
 <script>
+/* ══ THEME ══ */
+const LS_THEME = 'dashboard_theme';
+function applyTheme(t) {
+  document.body.classList.toggle('light', t === 'light');
+  const btn = document.getElementById('btn-theme');
+  if (btn) btn.textContent = t === 'light' ? '🌙' : '☀️';
+}
+function toggleTheme() {
+  const next = document.body.classList.contains('light') ? 'dark' : 'light';
+  localStorage.setItem(LS_THEME, next);
+  applyTheme(next);
+}
+applyTheme(localStorage.getItem(LS_THEME) || 'dark');
+
 /* ══ STATE ══ */
 let articles   = { fun:[], f1:[], biathlon:[], foot:[], fm:[] };
 let readIds    = new Set();
