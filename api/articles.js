@@ -89,8 +89,13 @@ function isPremium(item, sourceId) {
   if (typeAcces && typeAcces !== 'gratuit' && typeAcces !== 'free') return true;
   if (payant === 'true' || payant === '1') return true;
 
-  // Patterns explicites dans le titre ou les catégories uniquement
-  // (on ne filtre PAS sur description vide : trop de faux positifs pour les vidéos/podcasts L'Équipe)
+  // Fallback : description vide = article réservé aux abonnés
+  const snippet = (item.contentSnippet || '').trim();
+  const content = (item.contentFull    || '').trim();
+  const hasText = snippet.length > 10 || content.replace(/<[^>]+>/g, '').trim().length > 10;
+  if (!hasText) return true;
+
+  // Fallback : patterns dans le titre ou les catégories
   const title = (item.title || '').toLowerCase();
   const cats  = (item.categories || []).map((c) => String(c).toLowerCase());
   return (
