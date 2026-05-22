@@ -398,23 +398,26 @@ async function flushSyncQueue() {
 }
 
 async function fetchReadStatus() {
-  readIds = lsLoad(); // affichage instantané (cache potentiellement périmé)
-  await flushSyncQueue(); // rejoue les syncs ratées en premier
+  readIds = lsLoad();
+  console.log('[READ] localStorage IDs:', [...readIds]);
+  console.log('[READ] queue:', syncQueueLoad());
+  await flushSyncQueue();
+  console.log('[READ] queue après flush:', syncQueueLoad());
   try {
     const d = await fetch('/api/read', { signal: AbortSignal.timeout(8000) }).then(r => r.json());
-    // Supabase est la source de vérité — on REMPLACE, pas on fusionne
+    console.log('[READ] Supabase IDs:', d.read);
     const fromServer = new Set(d.read || []);
-    // On applique par-dessus les opérations locales pas encore syncées (offline)
     for (const { id, action } of syncQueueLoad()) {
       if (action === 'mark')   fromServer.add(id);
       if (action === 'unmark') fromServer.delete(id);
     }
     readIds = fromServer;
+    console.log('[READ] readIds final:', [...readIds]);
     lsSave();
     supabaseOk = true;
   } catch(e) {
     supabaseOk = false;
-    console.warn('Supabase indisponible, localStorage utilisé comme fallback:', e);
+    console.warn('[READ] Supabase indisponible:', e);
   }
   renderSyncStatus();
 }
