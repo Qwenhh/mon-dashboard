@@ -24,20 +24,27 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 
-  // ── GET : récupérer tous les IDs marqués comme lus ──────────
+  // ── GET : récupérer tous les IDs marqués comme lus (pagination) ──
   if (req.method === 'GET') {
-    const { data, error } = await supabase
-      .from('read_articles')
-      .select('article_id')
-      .limit(10000);
+    const allIds = [];
+    const PAGE = 1000;
+    let page = 0;
 
-    if (error) {
-      return res.status(500).json({ error: error.message });
+    while (page < 20) { // sécurité : max 20 000 IDs
+      const { data, error } = await supabase
+        .from('read_articles')
+        .select('article_id')
+        .range(page * PAGE, (page + 1) * PAGE - 1);
+
+      if (error) return res.status(500).json({ error: error.message });
+      if (!data || data.length === 0) break;
+
+      allIds.push(...data.map((row) => row.article_id));
+      if (data.length < PAGE) break; // dernière page
+      page++;
     }
 
-    return res.status(200).json({
-      read: (data || []).map((row) => row.article_id),
-    });
+    return res.status(200).json({ read: allIds });
   }
 
   // ── POST : marquer ou démarquer un article ───────────────────
