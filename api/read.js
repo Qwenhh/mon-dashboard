@@ -57,11 +57,16 @@ module.exports = async function handler(req, res) {
       if (error) return res.status(500).json({ error: error.message });
     } else {
       // action === 'mark' (par défaut)
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('read_articles')
-        .upsert({ article_id: articleId }, { onConflict: 'article_id' });
+        .upsert({ article_id: articleId }, { onConflict: 'article_id' })
+        .select();
 
       if (error) return res.status(500).json({ error: error.message });
+      // Si data est vide, RLS a bloqué l'insert silencieusement
+      if (!data || data.length === 0) {
+        return res.status(500).json({ error: 'Insert bloqué — vérifier RLS Supabase' });
+      }
     }
 
     return res.status(200).json({ ok: true });
