@@ -371,10 +371,11 @@ async function postRead(id, action) {
 async function syncRead(id, action) {
   try {
     await postRead(id, action);
+    console.log('[SYNC] POST ok:', action, id);
     // Succès — retire de la file si présent
     syncQueueSave(syncQueueLoad().filter(x => !(x.id === id && x.action === action)));
   } catch(e) {
-    console.warn('syncRead échoué, mis en file:', e.message);
+    console.warn('[SYNC] POST échoué:', action, id, e.message);
     // Ajoute à la file de retry si pas déjà présent
     const q = syncQueueLoad();
     if (!q.some(x => x.id === id && x.action === action))
@@ -402,6 +403,7 @@ async function fetchReadStatus() {
   await flushSyncQueue();
   try {
     const d = await fetch('/api/read', { signal: AbortSignal.timeout(8000) }).then(r => r.json());
+    console.log('[READ] Supabase count:', (d.read||[]).length);
     const fromServer = new Set(d.read || []);
     for (const { id, action } of syncQueueLoad()) {
       if (action === 'mark')   fromServer.add(id);
@@ -412,7 +414,7 @@ async function fetchReadStatus() {
     supabaseOk = true;
   } catch(e) {
     supabaseOk = false;
-    console.warn('Supabase indisponible, localStorage utilisé comme fallback:', e);
+    console.warn('Supabase indisponible:', e);
   }
   renderSyncStatus();
 }
