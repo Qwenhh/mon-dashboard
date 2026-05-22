@@ -24,8 +24,13 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 
-  // ── GET : récupérer tous les IDs marqués comme lus (pagination) ──
+  // ── GET : récupérer tous les IDs + nettoyage async des vieux ──
   if (req.method === 'GET') {
+    // Nettoyage fire-and-forget : supprime les IDs marqués il y a plus de 30 jours
+    const cutoff = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
+    supabase.from('read_articles').delete().lt('marked_at', cutoff)
+      .then(() => {}).catch(() => {});
+
     const allIds = [];
     const PAGE = 1000;
     let page = 0;
@@ -40,7 +45,7 @@ module.exports = async function handler(req, res) {
       if (!data || data.length === 0) break;
 
       allIds.push(...data.map((row) => row.article_id));
-      if (data.length < PAGE) break; // dernière page
+      if (data.length < PAGE) break;
       page++;
     }
 
@@ -64,16 +69,14 @@ module.exports = async function handler(req, res) {
       if (error) return res.status(500).json({ error: error.message });
     } else {
       // action === 'mark' (par défaut)
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('read_articles')
-        .upsert({ article_id: articleId }, { onConflict: 'article_id' })
-        .select();
+        .upsert(
+          { article_id: articleId, marked_at: new Date().toISOString() },
+          { onConflict: 'article_id' }
+        );
 
       if (error) return res.status(500).json({ error: error.message });
-      // Si data est vide, RLS a bloqué l'insert silencieusement
-      if (!data || data.length === 0) {
-        return res.status(500).json({ error: 'Insert bloqué — vérifier RLS Supabase' });
-      }
     }
 
     return res.status(200).json({ ok: true });
