@@ -434,7 +434,14 @@ function toggleRead(cat, id, e) {
   const wasRead = readIds.has(id);
   if (wasRead) readIds.delete(id); else readIds.add(id);
   lsSave();
-  syncRead(id, wasRead ? 'unmark' : 'mark');
+  const action = wasRead ? 'unmark' : 'mark';
+  // Écrit dans la queue IMMÉDIATEMENT avant d'attendre Supabase
+  // → si la page est rechargée avant la réponse, la queue recontient l'opération
+  const q = syncQueueLoad();
+  if (!q.some(x => x.id === id && x.action === action))
+    q.push({ id, action, ts: Date.now() });
+  syncQueueSave(q);
+  syncRead(id, action); // async — supprimera de la queue si succès
   renderAll();
   if (modalState.id === id) syncModalReadBtn();
 }
