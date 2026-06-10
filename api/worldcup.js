@@ -7,11 +7,11 @@ module.exports = async function handler(req, res) {
 
   // Fenêtre : hier → dans 3 jours
   const now = new Date();
-  const from = new Date(now); from.setDate(from.getDate() - 1);
-  const to   = new Date(now); to.setDate(to.getDate() + 3);
+  const from = new Date(now); from.setDate(from.getDate() - 2);
+  const to   = new Date(now); to.setDate(to.getDate() + 7);
   const fmt  = d => d.toISOString().split('T')[0];
 
-  const url = `https://api.football-data.org/v4/competitions/WC/matches?dateFrom=${fmt(from)}&dateTo=${fmt(to)}`;
+  const url = `https://api.football-data.org/v4/competitions/WC/matches?dateFrom=${fmt(from)}&dateTo=${fmt(to)}&limit=100`;
 
   try {
     const r = await fetch(url, {
