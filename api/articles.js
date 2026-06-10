@@ -26,15 +26,6 @@ const SOURCES = [
     category: 'fun', label: 'DTC', limit: 15,
   },
   {
-    id: 'tennis',
-    urls: [
-      'https://dwh.lequipe.fr/api/edito/rss?path=/Tennis/Roland-Garros/',
-      'AO:https://dwh.lequipe.fr/api/edito/rss?path=/Tennis/Roland-Garros/',
-      'RSSJ:https://dwh.lequipe.fr/api/edito/rss?path=/Tennis/Roland-Garros/',
-    ],
-    category: 'tennis', label: 'leq', limit: 50,
-  },
-  {
     id: 'f1',
     urls: [
       'https://dwh.lequipe.fr/api/edito/rss?path=/Formule-1/',
@@ -88,7 +79,7 @@ const SOURCES = [
 
 // ── Filtre articles abonnés L'Équipe ──────────────────────────
 function isPremium(item, sourceId) {
-  if (sourceId && !sourceId.startsWith('f1') && !sourceId.startsWith('biathlon') && !sourceId.startsWith('foot-leq') && !sourceId.startsWith('tennis')) {
+  if (sourceId && !sourceId.startsWith('f1') && !sourceId.startsWith('biathlon') && !sourceId.startsWith('foot-leq')) {
     return false;
   }
 
@@ -318,7 +309,7 @@ module.exports = async function handler(req, res) {
   }
 
   // Toujours renvoyer toutes les catégories même vides
-  ['fun', 'f1', 'biathlon', 'foot', 'fm', 'tennis'].forEach(cat => {
+  ['fun', 'f1', 'biathlon', 'foot', 'fm'].forEach(cat => {
     if (!byCategory[cat]) byCategory[cat] = [];
   });
 

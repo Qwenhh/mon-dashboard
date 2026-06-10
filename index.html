@@ -10,7 +10,7 @@
       --text: #e8e8f0; --muted: #6a6a85;
       --accent-fun: #c25e9a; --accent-f1: #e8322b; --accent-biat: #1f8ccd;
       --accent-foot: #27ae60; --accent-home: #7b6cf6;
-      --accent-vdm: #e04a6d; --accent-dtc: #9b6fd4; --accent-fm: #a855f7; --accent-fmr: #f59e0b; --accent-tennis: #16a34a;
+      --accent-vdm: #e04a6d; --accent-dtc: #9b6fd4; --accent-fm: #a855f7; --accent-fmr: #f59e0b;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
@@ -29,7 +29,6 @@
     .tab[data-tab="foot"].active     { border-bottom-color: var(--accent-foot); }
     .tab[data-tab="fm"].active        { border-bottom-color: var(--accent-fm); }
     .tab[data-tab="fmr"].active      { border-bottom-color: var(--accent-fmr); }
-    .tab[data-tab="tennis"].active   { border-bottom-color: var(--accent-tennis); }
     .tab-badge { background: var(--surface2); color: var(--muted); font-size: .65rem; padding: 1px 6px; border-radius: 20px; font-weight: 700; min-width: 18px; text-align: center; }
     .tab.active .tab-badge { background: rgba(255,255,255,.08); color: var(--text); }
     .btn-theme { margin-left: auto; flex-shrink: 0; background: none; border: none; font-size: 1.1rem; cursor: pointer; padding: 0 10px; align-self: center; opacity: .7; transition: opacity .15s; }
@@ -192,7 +191,6 @@
   <button class="tab" data-tab="foot">⚽ L'Équipe <span class="tab-badge" id="tbadge-foot">…</span></button>
   <button class="tab" data-tab="fm">🔵 Footmercato <span class="tab-badge" id="tbadge-fm">…</span></button>
   <button class="tab" data-tab="fmr">📖 Barça Reader <span class="tab-badge" id="tbadge-fmr">…</span></button>
-  <button class="tab" data-tab="tennis">🎾 Roland Garros <span class="tab-badge" id="tbadge-tennis">…</span></button>
   <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Basculer mode clair/sombre">☀️</button>
 </nav>
 
@@ -270,12 +268,7 @@
   </div>
 </div>
 
-<!-- TENNIS -->
-<div class="page" id="page-tennis">
-  <div class="articles-page">
-    <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-tennis" onclick="markAllToggle(['tennis'])">Tout marquer comme lu</button><button class="btn-unread-filter" onclick="toggleUnreadFilter()">Non lus seulement</button><button class="btn-refresh" onclick="refreshAll()">↻ Rafraîchir</button></div>
-    <div id="list-tennis"><div class="loading-msg">Chargement…</div></div>
-  </div>
+
 </div>
 
 <!-- FOOTMERCATO READER -->
@@ -318,7 +311,7 @@ function toggleTheme() {
 applyTheme(localStorage.getItem(LS_THEME) || 'dark');
 
 /* ══ STATE ══ */
-let articles   = { fun:[], f1:[], biathlon:[], foot:[], fm:[], tennis:[] };
+let articles   = { fun:[], f1:[], biathlon:[], foot:[], fm:[] };
 let readIds    = new Set();
 let unreadOnly = false;
 
@@ -544,7 +537,7 @@ function unreadCount(cats) {
 }
 
 function renderBadges() {
-  const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'], fm:['fm'], fmr:['fm'], tennis:['tennis'] };
+  const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'], fm:['fm'], fmr:['fm'] };
   Object.entries(g).forEach(([k,cats]) => {
     const n = unreadCount(cats);
     const badge = document.getElementById('tbadge-'+k);
@@ -565,7 +558,7 @@ function renderHomePreviews() {
 }
 
 function renderMarkAllBtns() {
-  const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'], fm:['fm'], fmr:['fm'], tennis:['tennis'] };
+  const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'], fm:['fm'], fmr:['fm'] };
   Object.entries(g).forEach(([k, cats]) => {
     const btn = document.getElementById('btn-markall-' + k);
     if (!btn) return;
@@ -582,7 +575,6 @@ function renderAll() {
   renderList('list-foot',     ['foot']);
   renderList('list-fm',       ['fm']);
   renderList('list-fmr',      ['fm'], true);
-  renderList('list-tennis',   ['tennis']);
   renderBadges();
   renderHomePreviews();
   renderMarkAllBtns();
