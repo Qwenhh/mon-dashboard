@@ -10,7 +10,7 @@
       --text: #e8e8f0; --muted: #6a6a85;
       --accent-fun: #c25e9a; --accent-f1: #e8322b; --accent-biat: #1f8ccd;
       --accent-foot: #27ae60; --accent-home: #7b6cf6;
-      --accent-vdm: #e04a6d; --accent-dtc: #9b6fd4; --accent-fm: #a855f7; --accent-fmr: #f59e0b; --accent-wc: #c8a227;
+      --accent-vdm: #e04a6d; --accent-dtc: #9b6fd4; --accent-fm: #a855f7; --accent-fmr: #f59e0b;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
@@ -29,7 +29,6 @@
     .tab[data-tab="foot"].active     { border-bottom-color: var(--accent-foot); }
     .tab[data-tab="fm"].active        { border-bottom-color: var(--accent-fm); }
     .tab[data-tab="fmr"].active      { border-bottom-color: var(--accent-fmr); }
-    .tab[data-tab="wc"].active       { border-bottom-color: var(--accent-wc); }
     .tab-badge { background: var(--surface2); color: var(--muted); font-size: .65rem; padding: 1px 6px; border-radius: 20px; font-weight: 700; min-width: 18px; text-align: center; }
     .tab.active .tab-badge { background: rgba(255,255,255,.08); color: var(--text); }
     .btn-theme { margin-left: auto; flex-shrink: 0; background: none; border: none; font-size: 1.1rem; cursor: pointer; padding: 0 10px; align-self: center; opacity: .7; transition: opacity .15s; }
@@ -177,35 +176,6 @@
     .btn-primary { flex: 1; padding: 10px; border-radius: 8px; border: none; font-size: .83rem; font-weight: 600; cursor: pointer; transition: opacity .15s; }
     .btn-primary:hover { opacity: .85; }
 
-    /* COUPE DU MONDE */
-    .wc-page { max-width: 780px; margin: 0 auto; padding: 16px; }
-    .wc-day  { margin-bottom: 24px; }
-    .wc-day-title { font-size: .7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
-    .wc-day-title::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-    .wc-match { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin-bottom: 6px; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; }
-    .wc-match.live { border-color: rgba(200,162,39,.5); background: rgba(200,162,39,.04); }
-    .wc-team { display: flex; align-items: center; gap: 8px; font-size: .88rem; font-weight: 600; }
-    .wc-team.away { flex-direction: row-reverse; }
-    .wc-team img { width: 22px; height: 22px; object-fit: contain; }
-    .wc-score { text-align: center; min-width: 70px; }
-    .wc-score-num { font-size: 1.3rem; font-weight: 800; letter-spacing: 2px; }
-    .wc-score-time { font-size: .68rem; color: var(--muted); margin-top: 2px; }
-    .wc-score-time.live { color: var(--accent-wc); font-weight: 700; }
-    .wc-badge { display: inline-block; font-size: .6rem; font-weight: 700; padding: 2px 7px; border-radius: 20px; text-transform: uppercase; letter-spacing: .5px; }
-    .wc-badge.scheduled { background: var(--surface2); color: var(--muted); }
-    .wc-badge.live      { background: rgba(200,162,39,.2); color: var(--accent-wc); }
-    .wc-badge.finished  { background: rgba(39,174,96,.1); color: #5ec98a; }
-    .wc-group { font-size: .62rem; color: var(--muted); margin-top: 2px; }
-    .wc-empty { padding: 30px; text-align: center; color: var(--muted); font-size: .85rem; }
-    /* mini widget accueil */
-    .wc-widget { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent-wc); border-radius: 12px; padding: 14px 18px; cursor: pointer; transition: border-color .15s; }
-    .wc-widget:hover { border-color: var(--accent-wc); }
-    .wc-widget-title { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .7px; color: var(--accent-wc); margin-bottom: 10px; }
-    .wc-widget-match { display: flex; align-items: center; justify-content: space-between; font-size: .8rem; padding: 5px 0; border-bottom: 1px solid var(--border); gap: 8px; }
-    .wc-widget-match:last-child { border-bottom: none; }
-    .wc-widget-teams { flex: 1; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .wc-widget-score { font-weight: 800; white-space: nowrap; }
-    .wc-widget-time  { font-size: .68rem; color: var(--muted); white-space: nowrap; }
     .btn-read-modal { background: rgba(39,174,96,.15); color: #27ae60; border: 1px solid rgba(39,174,96,.3); }
     .btn-read-modal.done { background: rgba(39,174,96,.25); }
     .btn-open { background: var(--surface2); color: var(--text); border: 1px solid var(--border); text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 5px; }
@@ -222,7 +192,6 @@
   <button class="tab" data-tab="foot">⚽ L'Équipe <span class="tab-badge" id="tbadge-foot">…</span></button>
   <button class="tab" data-tab="fm">🔵 Footmercato <span class="tab-badge" id="tbadge-fm">…</span></button>
   <button class="tab" data-tab="fmr">📖 Barça Reader <span class="tab-badge" id="tbadge-fmr">…</span></button>
-  <button class="tab" data-tab="wc">🌍 Coupe du Monde</button>
   <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Basculer mode clair/sombre">☀️</button>
 </nav>
 
@@ -246,12 +215,6 @@
       <div class="team-card" id="team-monaco"><div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">AS Monaco</span></div><div class="widget-sub">Chargement…</div></div>
       <div class="team-card" id="team-barce"><div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">FC Barcelone</span></div><div class="widget-sub">Chargement…</div></div>
       <div class="team-card" id="team-france"><div class="team-header"><span style="font-size:1.3rem">🇫🇷</span><span class="team-name">Équipe de France</span></div><div class="widget-sub">Chargement…</div></div>
-    </div>
-
-    <div class="section-divider">Coupe du Monde 2026</div>
-    <div class="wc-widget" id="widget-wc" onclick="document.querySelector('.tab[data-tab=wc]').click()">
-      <div class="wc-widget-title">🌍 Matchs du jour</div>
-      <div id="widget-wc-body"><div class="widget-sub">Chargement…</div></div>
     </div>
 
     <div class="section-divider">Articles à lire</div>
@@ -314,17 +277,6 @@
   <div class="articles-page">
     <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-fmr" onclick="markAllToggle(['fm'])">Tout marquer comme lu</button><button class="btn-unread-filter" onclick="toggleUnreadFilter()">Non lus seulement</button><button class="btn-refresh" onclick="refreshAll()">↻ Rafraîchir</button></div>
     <div id="list-fmr"><div class="loading-msg">Chargement…</div></div>
-  </div>
-</div>
-
-<!-- COUPE DU MONDE -->
-<div class="page" id="page-wc">
-  <div class="wc-page">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <h2 style="font-size:1rem;font-weight:800">🌍 Coupe du Monde 2026</h2>
-      <button class="btn-refresh" onclick="loadWorldCup(true)">↻ Rafraîchir</button>
-    </div>
-    <div id="wc-content"><div class="wc-empty">Chargement…</div></div>
   </div>
 </div>
 
@@ -855,123 +807,6 @@ async function loadTeam({teamKey,displayName,id}){
   }
 }
 
-/* ══ COUPE DU MONDE 2026 ══ */
-let wcMatches = [];
-
-function wcParisTime(iso) {
-  const d = new Date(iso);
-  return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Paris' });
-}
-function wcParisDay(iso) {
-  const d = new Date(iso);
-  return d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Paris' });
-}
-function wcDayKey(iso) {
-  const d = new Date(iso);
-  // Clé YYYY-MM-DD en heure de Paris
-  return d.toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' }); // fr-CA = YYYY-MM-DD
-}
-function wcStageLabel(stage) {
-  const map = {
-    GROUP_STAGE: 'Phase de groupes', ROUND_OF_32: '1/16 de finale',
-    ROUND_OF_16: '1/8 de finale', QUARTER_FINALS: 'Quart de finale',
-    SEMI_FINALS: 'Demi-finale', THIRD_PLACE: 'Match 3e place', FINAL: 'Finale',
-  };
-  return map[stage] || stage;
-}
-
-function renderWorldCup() {
-  const container = document.getElementById('wc-content');
-  const widget    = document.getElementById('widget-wc-body');
-  if (!container) return;
-
-  if (!wcMatches.length) {
-    container.innerHTML = '<div class="wc-empty">Aucun match dans la fenêtre affichée.</div>';
-    if (widget) widget.innerHTML = '<div class="widget-sub" style="font-size:.75rem">Aucun match prévu.</div>';
-    return;
-  }
-
-  // Grouper par jour Paris
-  const todayKey = new Date().toLocaleDateString('fr-CA', { timeZone: 'Europe/Paris' });
-  const byDay = {};
-  for (const m of wcMatches) {
-    const k = wcDayKey(m.utcDate);
-    if (!byDay[k]) byDay[k] = [];
-    byDay[k].push(m);
-  }
-
-  // Rendu page complète
-  container.innerHTML = Object.entries(byDay).sort(([a],[b]) => a.localeCompare(b)).map(([day, matches]) => {
-    const isToday = day === todayKey;
-    const label   = isToday ? 'Aujourd\'hui — ' + wcParisDay(matches[0].utcDate) : wcParisDay(matches[0].utcDate);
-    const rows = matches.map(m => {
-      const isLive = m.status === 'IN_PLAY' || m.status === 'PAUSED';
-      const isDone = m.status === 'FINISHED';
-      const scoreHtml = isDone || isLive
-        ? `<div class="wc-score-num">${m.scoreHome ?? '?'} – ${m.scoreAway ?? '?'}</div>`
-        : `<div class="wc-score-num" style="font-size:.85rem;color:var(--muted)">${wcParisTime(m.utcDate)}</div>`;
-      const badgeCls  = isLive ? 'live' : isDone ? 'finished' : 'scheduled';
-      const badgeTxt  = isLive ? '🔴 En direct' : isDone ? 'Terminé' : 'À venir';
-      const crestHome = m.homeCrest ? `<img src="${m.homeCrest}" alt="" onerror="this.style.display='none'">` : '';
-      const crestAway = m.awayCrest ? `<img src="${m.awayCrest}" alt="" onerror="this.style.display='none'">` : '';
-      const groupTxt  = m.group ? `Groupe ${m.group.replace('GROUP_','')}` : wcStageLabel(m.stage);
-      return `<div class="wc-match${isLive?' live':''}">
-        <div class="wc-team">${crestHome}<span>${m.home}</span></div>
-        <div class="wc-score">
-          ${scoreHtml}
-          <div class="wc-score-time${isLive?' live':''}"><span class="wc-badge ${badgeCls}">${badgeTxt}</span></div>
-          <div class="wc-group">${groupTxt}</div>
-        </div>
-        <div class="wc-team away"><span>${m.away}</span>${crestAway}</div>
-      </div>`;
-    }).join('');
-    return `<div class="wc-day"><div class="wc-day-title">${label}</div>${rows}</div>`;
-  }).join('');
-
-  // Mini widget accueil : matchs du jour seulement
-  if (widget) {
-    const todayMatches = byDay[todayKey] || [];
-    if (!todayMatches.length) {
-      const nextKey = Object.keys(byDay).sort().find(k => k > todayKey);
-      const nextMatches = nextKey ? byDay[nextKey] : [];
-      if (nextMatches.length) {
-        widget.innerHTML = `<div class="widget-sub" style="font-size:.75rem;margin-bottom:8px">Prochain : ${wcParisDay(nextMatches[0].utcDate)}</div>` +
-          nextMatches.slice(0,3).map(m => `<div class="wc-widget-match">
-            <div class="wc-widget-teams">${m.home} vs ${m.away}</div>
-            <div class="wc-widget-time">${wcParisTime(m.utcDate)}</div>
-          </div>`).join('');
-      } else {
-        widget.innerHTML = '<div class="widget-sub" style="font-size:.75rem">Pas de match aujourd\'hui.</div>';
-      }
-    } else {
-      widget.innerHTML = todayMatches.slice(0,5).map(m => {
-        const isLive = m.status === 'IN_PLAY' || m.status === 'PAUSED';
-        const isDone = m.status === 'FINISHED';
-        const score  = (isDone || isLive) ? `${m.scoreHome??'?'} – ${m.scoreAway??'?'}` : wcParisTime(m.utcDate);
-        return `<div class="wc-widget-match">
-          <div class="wc-widget-teams">${m.home} vs ${m.away}</div>
-          <div class="wc-widget-score" style="${isLive?'color:var(--accent-wc)':''}">${score}</div>
-        </div>`;
-      }).join('');
-    }
-  }
-}
-
-async function loadWorldCup(force = false) {
-  const url = force ? '/api/worldcup?t=' + Date.now() : '/api/worldcup';
-  const opts = force ? { cache: 'no-store' } : {};
-  try {
-    const data = await fetch(url, opts).then(r => r.json());
-    if (data.error) throw new Error(data.error);
-    wcMatches = data.matches || [];
-  } catch(e) {
-    const container = document.getElementById('wc-content');
-    if (container) container.innerHTML = `<div class="wc-empty">Impossible de charger les matchs : ${e.message}</div>`;
-    return;
-  }
-  renderWorldCup();
-}
-
 /* ══ INIT ══ */
 function updateClock(){ document.getElementById('last-update').textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); renderAll(); }
 updateClock(); setInterval(updateClock,60000);
@@ -984,7 +819,6 @@ Promise.allSettled([
   loadFinance('WPEA.PA',       'IE0002XZSHO1', 'widget-msci', '📈 MSCI World PEA', '€'),
   loadFinance('ALCPB.PA',      'FR0011053636', 'widget-capb', '📊 Capital B',  '€'),
   loadF1GP(),
-  loadWorldCup(),
   ...TEAMS.map(t=>loadTeam(t)),
 ]);
 </script>
