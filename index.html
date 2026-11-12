@@ -94,6 +94,7 @@
     .team-section-label { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--muted); margin-bottom: 5px; }
     .team-match { background: var(--surface2); border-radius: 8px; padding: 8px 10px; }
     .team-match-teams { font-size: .8rem; font-weight: 600; margin-bottom: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .team-match + .team-match { margin-top: 6px; }
     .team-match-info { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .team-match-date { font-size: .7rem; color: var(--muted); }
     .result-badge { font-size: .65rem; font-weight: 800; padding: 2px 6px; border-radius: 4px; }
@@ -811,33 +812,39 @@ const TEAMS=[
   {teamKey:'france', displayName:'Équipe de France', id:'team-france'},
 ];
 function frDate(iso){ if(!iso)return''; const dt=new Date(iso); return dt.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',timeZone:'Europe/Paris'})+' · '+dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Paris'}); }
+function teamMatchHtml(m, kind){
+  const venue = m.isHome ? '🏠 ' : '✈️ ';
+  const comp = m.competition ? `<span class="comp-text">${esc(m.competition)}</span>` : '';
+  let info;
+  if (kind === 'live') {
+    info = `<span class="result-badge" style="background:rgba(224,74,109,.2);color:#e04a6d">🔴 EN DIRECT${m.clock?' '+esc(m.clock):''}</span><span class="score-text">${m.myScore ?? 0} – ${m.oppScore ?? 0}</span>`;
+  } else if (kind === 'last') {
+    const res = m.myScore > m.oppScore ? 'V' : m.myScore < m.oppScore ? 'D' : 'N';
+    info = `<span class="result-badge result-${res}">${res}</span><span class="score-text">${m.myScore} – ${m.oppScore}${m.shootout?' (tab)':''}</span><span class="comp-text">${frDate(m.utcDate)}</span>`;
+  } else {
+    info = `<span class="comp-text">${frDate(m.utcDate)}</span>`;
+  }
+  return `<div class="team-match"><div class="team-match-teams">${venue}vs ${esc(m.opponent)}</div><div class="team-match-info">${info}</div><div class="team-match-info" style="margin-top:2px">${comp}</div></div>`;
+}
 async function loadTeam({teamKey,displayName,id}){
   const el=document.getElementById(id);
   try{
     const r=await fetch(`/api/football?team=${teamKey}`,{signal:AbortSignal.timeout(12000)});
     const data=await r.json();
     if(data.error) throw new Error(data.error);
-    let html=`<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${displayName}</span></div>`;
-    // isHome, opponent, myScore, oppScore sont maintenant pré-calculés côté serveur
-    if(data.last){
-      const m=data.last;
-      const res=m.myScore>m.oppScore?'V':m.myScore<m.oppScore?'D':'N';
-      html+=`<div class="team-section"><div class="team-section-label">Dernier match <span style="font-size:.65rem;color:var(--muted)">${esc(m.competition||'')}</span></div><div class="team-match">
-        <div class="team-match-teams">${m.isHome?'🏠 ':'✈️ '}vs ${esc(m.opponent)}</div>
-        <div class="team-match-info"><span class="result-badge result-${res}">${res}</span><span class="score-text">${m.myScore} – ${m.oppScore}</span><span class="comp-text">${frDate(m.utcDate)}</span></div>
-      </div></div>`;
-    }
-    if(data.next){
-      const m=data.next;
-      html+=`<div class="team-section"><div class="team-section-label">Prochain match <span style="font-size:.65rem;color:var(--muted)">${esc(m.competition||'')}</span></div><div class="team-match">
-        <div class="team-match-teams">${m.isHome?'🏠 ':'✈️ '}vs ${esc(m.opponent)}</div>
-        <div class="team-match-info"><span class="comp-text">${frDate(m.utcDate)}</span></div>
-      </div></div>`;
-    }
-    if(!data.last&&!data.next) html+=`<div class="widget-sub">Aucun match trouvé</div>`;
+    const asList = v => Array.isArray(v) ? v : (v ? [v] : []);
+    const last = asList(data.last), next = asList(data.next);
+    let html=`<div class="team-header"><span style="font-size:1.3rem">${teamKey==='france'?'🇫🇷':'⚽'}</span><span class="team-name">${esc(displayName)}</span></div>`;
+    if(data.live) html+=`<div class="team-section"><div class="team-section-label">En ce moment</div>${teamMatchHtml(data.live,'live')}</div>`;
+    if(last.length) html+=`<div class="team-section"><div class="team-section-label">Derniers matchs</div>${last.map(m=>teamMatchHtml(m,'last')).join('')}</div>`;
+    if(next.length) html+=`<div class="team-section"><div class="team-section-label">Prochains matchs</div>${next.map(m=>teamMatchHtml(m,'next')).join('')}</div>`;
+    if(!data.live&&!last.length&&!next.length) html+=`<div class="widget-sub">Aucun match trouvé</div>`;
     el.innerHTML=html;
+    el.dataset.loaded='1';
   }catch(e){
-    el.innerHTML=`<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${displayName}</span></div><div class="widget-sub">Données indisponibles — ${esc(e.message)}</div>`;
+    // Rafraîchissement auto : on garde l'affichage précédent plutôt que de l'effacer
+    if(el.dataset.loaded) { console.warn('Refresh équipe échoué:', displayName, e.message); return; }
+    el.innerHTML=`<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${esc(displayName)}</span></div><div class="widget-sub">Données indisponibles — ${esc(e.message)}</div>`;
   }
 }
 
