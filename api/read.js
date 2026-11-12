@@ -24,13 +24,8 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: err.message });
   }
 
-  // ── GET : récupérer tous les IDs + nettoyage async des vieux ──
+  // ── GET : récupérer tous les IDs lus ──
   if (req.method === 'GET') {
-    // Nettoyage fire-and-forget : supprime les IDs marqués il y a plus de 30 jours
-    const cutoff = new Date(Date.now() - 30 * 24 * 3600 * 1000).toISOString();
-    supabase.from('read_articles').delete().lt('marked_at', cutoff)
-      .then(() => {}).catch(() => {});
-
     const allIds = [];
     const PAGE = 1000;
     let page = 0;
@@ -54,7 +49,28 @@ module.exports = async function handler(req, res) {
 
   // ── POST : marquer ou démarquer un article ───────────────────
   if (req.method === 'POST') {
-    const { articleId, action } = req.body || {};
+    const { articleId, action, visible } = req.body || {};
+
+    // ── Nettoyage : supprime les IDs lus dont l'article n'est plus dans aucun flux ──
+    // `visible` = IDs de tous les articles actuellement affichés par le dashboard.
+    // Sécurités : marge de 3 jours (un autre appareil peut avoir un flux plus ancien),
+    // liste de taille plausible, et expiration dure à 45 jours quoi qu'il arrive.
+    if (action === 'prune') {
+      const ids = Array.isArray(visible) ? visible.filter((v) => typeof v === 'string' && /^[a-z0-9]+$/.test(v)) : [];
+      const DAY = 24 * 3600 * 1000;
+      const hard = await supabase.from('read_articles').delete()
+        .lt('marked_at', new Date(Date.now() - 45 * DAY).toISOString());
+      if (hard.error) return res.status(500).json({ error: hard.error.message });
+
+      if (ids.length < 20 || ids.length > 800) {
+        return res.status(200).json({ ok: true, pruned: false, reason: 'liste visible non plausible' });
+      }
+      const { error } = await supabase.from('read_articles').delete()
+        .lt('marked_at', new Date(Date.now() - 3 * DAY).toISOString())
+        .not('article_id', 'in', `(${ids.join(',')})`);
+      if (error) return res.status(500).json({ error: error.message });
+      return res.status(200).json({ ok: true, pruned: true });
+    }
 
     if (!articleId) {
       return res.status(400).json({ error: 'articleId manquant' });

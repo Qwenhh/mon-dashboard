@@ -853,7 +853,23 @@ async function loadTeam({teamKey,displayName,id}){
 function updateClock(){ document.getElementById('last-update').textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); renderAll(); }
 updateClock(); setInterval(updateClock,60000);
 
-Promise.allSettled([fetchReadStatus(), loadArticles()]).then(renderAll);
+/* Nettoyage des IDs lus obsolètes : 1x/jour max, seulement si TOUS les flux ont répondu */
+async function pruneReadIds() {
+  const LS_PRUNE = 'dashboard_lastPrune';
+  try {
+    if (Date.now() - Number(localStorage.getItem(LS_PRUNE) || 0) < 24 * 3600 * 1000) return;
+    const cats = ['fun','f1','biathlon','foot','fm'];
+    if (cats.some(c => !(articles[c] || []).length)) return; // un flux vide/en panne → on ne touche à rien
+    const visible = cats.flatMap(c => articles[c].map(a => a.id));
+    const r = await fetch('/api/read', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'prune', visible }), signal: AbortSignal.timeout(10000),
+    });
+    if (r.ok) localStorage.setItem(LS_PRUNE, String(Date.now()));
+  } catch (e) { console.warn('Nettoyage lus échoué:', e.message); }
+}
+
+Promise.allSettled([fetchReadStatus(), loadArticles()]).then(() => { renderAll(); pruneReadIds(); });
 
 Promise.allSettled([
   loadWeather(),
