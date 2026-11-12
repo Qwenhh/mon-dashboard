@@ -145,6 +145,7 @@
     .article-card.read { opacity: .32; }
     .article-card.read:hover { opacity: .5; }
     .article-main { flex: 1; padding: 12px 14px; min-width: 0; }
+    a.article-main { display: block; text-decoration: none; color: inherit; }
     .article-source-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
     .article-source-tag { font-size: .65rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; padding: 2px 7px; border-radius: 20px; }
     .tag-vdm { background: rgba(224,74,109,.15); color: var(--accent-vdm); }
@@ -182,6 +183,7 @@
   </style>
 </head>
 <body>
+<script>try{if(localStorage.getItem('dashboard_theme')==='light')document.body.classList.add('light')}catch(e){}</script>
 
 <nav>
   <div class="nav-logo">📰 Dashboard</div>
@@ -267,9 +269,6 @@
     <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-fm" onclick="markAllToggle(['fm'])">Tout marquer comme lu</button><button class="btn-unread-filter" onclick="toggleUnreadFilter()">Non lus seulement</button><button class="btn-refresh" onclick="refreshAll()">↻ Rafraîchir</button></div>
     <div id="list-fm"><div class="loading-msg">Chargement…</div></div>
   </div>
-</div>
-
-
 </div>
 
 <!-- FOOTMERCATO READER -->
@@ -467,7 +466,7 @@ async function loadArticles() {
   } catch(e) {
     ['fun','f1','biathlon','foot'].forEach(cat => {
       const el = document.getElementById('list-'+cat);
-      if (el) el.innerHTML = `<div class="error-msg">Impossible de charger les articles.<br><small>${e.message}</small></div>`;
+      if (el) el.innerHTML = `<div class="error-msg">Impossible de charger les articles.<br><small>${esc(e.message)}</small></div>`;
     });
     return;
   }
@@ -489,17 +488,39 @@ function toggleUnreadFilter() {
   renderAll();
 }
 
+let refreshing = false;
+let lastRefresh = Date.now();
 async function refreshAll() {
+  if (refreshing) return;
+  refreshing = true;
   const btn = document.getElementById('btn-refresh');
   if (btn) { btn.disabled = true; btn.textContent = '↻…'; }
   try {
     const data = await fetch('/api/articles?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json());
     articles = data;
   } catch(e) { console.warn('Refresh articles échoué:', e); }
-  await fetchReadStatus();
+  await Promise.allSettled([fetchReadStatus(), ...TEAMS.map(t => loadTeam(t))]);
   renderAll();
   updateClock();
+  lastRefresh = Date.now();
+  refreshing = false;
   if (btn) { btn.disabled = false; btn.textContent = '↻ Rafraîchir'; }
+}
+
+/* Rafraîchissement auto : toutes les 5 min, seulement si l'onglet est visible */
+const AUTO_REFRESH_MS = 5 * 60 * 1000;
+setInterval(() => { if (!document.hidden) refreshAll(); }, AUTO_REFRESH_MS);
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && Date.now() - lastRefresh > AUTO_REFRESH_MS) refreshAll();
+});
+
+/* ══ SÉCURITÉ : échappement HTML + URLs ══ */
+function esc(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+function safeUrl(u) {
+  try { const x = new URL(u); return (x.protocol === 'https:' || x.protocol === 'http:') ? x.href : '#'; }
+  catch { return '#'; }
 }
 
 function renderList(containerId, cats, readerMode = false) {
@@ -514,24 +535,36 @@ function renderList(containerId, cats, readerMode = false) {
 
   c.innerHTML = items.map(a => {
     const read = readIds.has(a.id);
-    const text = a.title || a.content || '';
+    const text = esc(a.title || a.content || '');
     const isLink = !readerMode && (a.label === 'leq' || a.label === 'fm');
-    const clickFn = readerMode ? `openReaderModal('${a.id}')` : `openModal('${a.id}')`;
-    const open  = isLink
-      ? `<a class="article-card ${read?'read':''}" href="${a.link}" target="_blank" rel="noopener noreferrer" onclick="openInBackground(event,'${a.link}')">`
-      : `<div class="article-card ${read?'read':''}" onclick="${clickFn}">`;
-    const close = isLink ? '</a>' : '</div>';
-    return `${open}
-      <div class="article-main">
-        <div class="article-source-row">${tagHtml(a)}<span class="article-time">${relTime(a.date)}</span><span class="article-time" style="margin-left:auto;opacity:.6">${pubDate(a.date)}</span></div>
-        <div class="article-text">${text}</div>
-      </div>
-      <button class="read-action" onclick="toggleRead('${a.category}','${a.id}',event)" title="Marquer comme lu">
+    const mode = readerMode ? 'reader' : isLink ? 'link' : 'modal';
+    const meta = `<div class="article-source-row">${tagHtml(a)}<span class="article-time">${relTime(a.date)}</span><span class="article-time" style="margin-left:auto;opacity:.6">${pubDate(a.date)}</span></div>
+        <div class="article-text">${text}</div>`;
+    const main = isLink
+      ? `<a class="article-main" href="${esc(safeUrl(a.link))}" target="_blank" rel="noopener noreferrer">${meta}</a>`
+      : `<div class="article-main">${meta}</div>`;
+    return `<div class="article-card ${read?'read':''}" data-id="${esc(a.id)}" data-mode="${mode}">
+      ${main}
+      <button class="read-action" data-action="toggle-read" title="Marquer comme lu">
         <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
       </button>
-    ${close}`;
+    </div>`;
   }).join('');
 }
+
+// Délégation d'événements : un seul écouteur pour toutes les cartes
+document.addEventListener('click', e => {
+  const card = e.target.closest('.article-card');
+  if (!card) return;
+  const id = card.dataset.id;
+  if (e.target.closest('[data-action="toggle-read"]')) { toggleRead(null, id, e); return; }
+  const mode = card.dataset.mode;
+  if (mode === 'link') {
+    const a = e.target.closest('a.article-main');
+    if (a) openInBackground(e, a.href);
+  } else if (mode === 'reader') openReaderModal(id);
+  else openModal(id);
+});
 
 function unreadCount(cats) {
   return cats.flatMap(c => articles[c]||[]).filter(a => !readIds.has(a.id)).length;
@@ -554,7 +587,7 @@ function renderHomePreviews() {
     const el = document.getElementById('home-preview-'+k);
     if (!el) return;
     const items = cats.flatMap(c => articles[c]||[]).filter(a=>!readIds.has(a.id)).slice(0,3);
-    el.innerHTML = items.map(a=>`<div class="home-preview-item">${(a.title||a.content||'').slice(0,65)}…</div>`).join('');
+    el.innerHTML = items.map(a=>`<div class="home-preview-item">${esc((a.title||a.content||'').slice(0,65))}…</div>`).join('');
   });
 }
 
@@ -634,20 +667,21 @@ async function openReaderModal(id) {
     const data = await fetch('/api/article?url=' + encodeURIComponent(a.link)).then(r => r.json());
     if (data.error) throw new Error(data.error);
 
+    const link = esc(safeUrl(a.link));
     let html = '';
-    if (data.title) html += `<p style="font-size:1.05rem;font-weight:700;margin-bottom:12px">${data.title}</p>`;
-    if (data.lead)  html += `<p style="font-style:italic;color:var(--muted);margin-bottom:16px;border-left:3px solid var(--accent-fm);padding-left:12px">${data.lead}</p>`;
+    if (data.title) html += `<p style="font-size:1.05rem;font-weight:700;margin-bottom:12px">${esc(data.title)}</p>`;
+    if (data.lead)  html += `<p style="font-style:italic;color:var(--muted);margin-bottom:16px;border-left:3px solid var(--accent-fm);padding-left:12px">${esc(data.lead)}</p>`;
     if (data.body) {
       html += data.body.split('\n\n').filter(Boolean).map(p =>
         p.startsWith('**') && p.endsWith('**')
-          ? `<h3 style="font-size:.92rem;font-weight:700;margin:14px 0 6px">${p.slice(2,-2)}</h3>`
-          : `<p style="margin-bottom:12px">${p}</p>`
+          ? `<h3 style="font-size:.92rem;font-weight:700;margin:14px 0 6px">${esc(p.slice(2,-2))}</h3>`
+          : `<p style="margin-bottom:12px">${esc(p)}</p>`
       ).join('');
     }
-    if (!html) html = `<div class="error-msg">Contenu non disponible — <a href="${a.link}" target="_blank" style="color:var(--accent-fm)">ouvrir sur Footmercato →</a></div>`;
+    if (!html) html = `<div class="error-msg">Contenu non disponible — <a href="${link}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-fm)">ouvrir sur Footmercato →</a></div>`;
     document.getElementById('modal-body').innerHTML = html;
   } catch(e) {
-    document.getElementById('modal-body').innerHTML = `<div class="error-msg">Impossible de charger l'article : ${e.message}<br><br><a href="${a.link}" target="_blank" style="color:var(--accent-fm)">Ouvrir sur Footmercato →</a></div>`;
+    document.getElementById('modal-body').innerHTML = `<div class="error-msg">Impossible de charger l'article : ${esc(e.message)}<br><br><a href="${esc(safeUrl(a.link))}" target="_blank" rel="noopener noreferrer" style="color:var(--accent-fm)">Ouvrir sur Footmercato →</a></div>`;
   }
 }
 
@@ -788,22 +822,22 @@ async function loadTeam({teamKey,displayName,id}){
     if(data.last){
       const m=data.last;
       const res=m.myScore>m.oppScore?'V':m.myScore<m.oppScore?'D':'N';
-      html+=`<div class="team-section"><div class="team-section-label">Dernier match <span style="font-size:.65rem;color:var(--muted)">${m.competition||''}</span></div><div class="team-match">
-        <div class="team-match-teams">${m.isHome?'🏠 ':'✈️ '}vs ${m.opponent}</div>
+      html+=`<div class="team-section"><div class="team-section-label">Dernier match <span style="font-size:.65rem;color:var(--muted)">${esc(m.competition||'')}</span></div><div class="team-match">
+        <div class="team-match-teams">${m.isHome?'🏠 ':'✈️ '}vs ${esc(m.opponent)}</div>
         <div class="team-match-info"><span class="result-badge result-${res}">${res}</span><span class="score-text">${m.myScore} – ${m.oppScore}</span><span class="comp-text">${frDate(m.utcDate)}</span></div>
       </div></div>`;
     }
     if(data.next){
       const m=data.next;
-      html+=`<div class="team-section"><div class="team-section-label">Prochain match <span style="font-size:.65rem;color:var(--muted)">${m.competition||''}</span></div><div class="team-match">
-        <div class="team-match-teams">${m.isHome?'🏠 ':'✈️ '}vs ${m.opponent}</div>
+      html+=`<div class="team-section"><div class="team-section-label">Prochain match <span style="font-size:.65rem;color:var(--muted)">${esc(m.competition||'')}</span></div><div class="team-match">
+        <div class="team-match-teams">${m.isHome?'🏠 ':'✈️ '}vs ${esc(m.opponent)}</div>
         <div class="team-match-info"><span class="comp-text">${frDate(m.utcDate)}</span></div>
       </div></div>`;
     }
     if(!data.last&&!data.next) html+=`<div class="widget-sub">Aucun match trouvé</div>`;
     el.innerHTML=html;
   }catch(e){
-    el.innerHTML=`<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${displayName}</span></div><div class="widget-sub">Données indisponibles — ${e.message}</div>`;
+    el.innerHTML=`<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${displayName}</span></div><div class="widget-sub">Données indisponibles — ${esc(e.message)}</div>`;
   }
 }
 

@@ -161,22 +161,46 @@ async function fetchViaRss2Json(rssUrl, limit) {
 }
 
 // ── Scraping page club Footmercato (Barcelone) ───────────────
+// Décalage Europe/Paris (ms) à un instant donné — gère automatiquement heure d'été/hiver
+function parisParts(date) {
+  return Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'Europe/Paris', hourCycle: 'h23',
+      year: 'numeric', month: 'numeric', day: 'numeric',
+      hour: 'numeric', minute: 'numeric', second: 'numeric',
+    }).formatToParts(date).filter(p => p.type !== 'literal').map(p => [p.type, Number(p.value)])
+  );
+}
+function parisOffsetMs(date) {
+  const p = parisParts(date);
+  return Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute, p.second) - Math.floor(date.getTime() / 1000) * 1000;
+}
+// Convertit une date/heure "murale" Paris en instant UTC
+function parisToUtc(y, m, d, h, mi) {
+  const guess = Date.UTC(y, m - 1, d, h, mi);
+  let t = guess - parisOffsetMs(new Date(guess));
+  t = guess - parisOffsetMs(new Date(t));
+  return new Date(t);
+}
+
 function parseFmDate(str) {
   const now = new Date();
+  const today = parisParts(now);
   const timeMatch = str.match(/^(\d{1,2}):(\d{2})/);
   if (timeMatch) {
-    // Heure Paris (CEST = UTC+2 en avril)
-    const candidate = new Date(now);
-    candidate.setUTCHours(parseInt(timeMatch[1]) - 2, parseInt(timeMatch[2]), 0, 0);
-    if (candidate > now) candidate.setUTCDate(candidate.getUTCDate() - 1);
+    // Heure Paris du jour ; si elle est dans le futur, c'est celle d'hier
+    let candidate = parisToUtc(today.year, today.month, today.day, parseInt(timeMatch[1]), parseInt(timeMatch[2]));
+    if (candidate > now) candidate = new Date(candidate.getTime() - 24 * 3600 * 1000);
     return candidate.toISOString();
   }
   const dateMatch = str.match(/^(\d{1,2})\/(\d{1,2})/);
   if (dateMatch) {
-    const d = new Date(now);
-    d.setMonth(parseInt(dateMatch[2]) - 1, parseInt(dateMatch[1]));
-    d.setUTCHours(10, 0, 0, 0);
-    return d.toISOString();
+    let candidate = parisToUtc(today.year, parseInt(dateMatch[2]), parseInt(dateMatch[1]), 12, 0);
+    // Date "dd/mm" dans le futur → c'était l'année dernière (passage de janvier)
+    if (candidate.getTime() > now.getTime() + 24 * 3600 * 1000) {
+      candidate = parisToUtc(today.year - 1, parseInt(dateMatch[2]), parseInt(dateMatch[1]), 12, 0);
+    }
+    return candidate.toISOString();
   }
   return new Date(Date.now() - 3600000).toISOString();
 }
