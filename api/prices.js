@@ -3,32 +3,10 @@
 // GET : renvoie, par produit et par source, le dernier prix + historique 30 jours
 //
 // Table Supabase attendue : price_checks (voir README du SQL dans la conversation)
-const { createClient } = require('@supabase/supabase-js');
-const crypto = require('crypto');
+const { getSupabase, requireToken, clip, safeUrl } = require('./_auth');
 
 const DAY = 24 * 3600 * 1000;
 const SLUG = /^[a-z0-9][a-z0-9-]{0,40}$/;
-
-function getSupabase() {
-  if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
-    throw new Error('Variables SUPABASE_URL et SUPABASE_SERVICE_KEY manquantes');
-  }
-  return createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
-}
-
-const clip = (s, n) => (typeof s === 'string' && s.trim() ? s.trim().slice(0, n) : null);
-function safeUrl(u) {
-  try { const x = new URL(u); return x.protocol === 'https:' || x.protocol === 'http:' ? x.href.slice(0, 500) : null; }
-  catch { return null; }
-}
-// Renvoie 'ok' | 'unconfigured' | 'invalid' (sans jamais révéler la valeur attendue)
-function checkToken(req) {
-  const want = String(process.env.PRICE_TOKEN || '').trim();
-  if (want.length < 16) return 'unconfigured'; // variable absente (ou pas encore redéployée) / trop courte
-  const a = Buffer.from(String(req.headers['x-api-key'] || '').trim());
-  const b = Buffer.from(want);
-  return a.length === b.length && crypto.timingSafeEqual(a, b) ? 'ok' : 'invalid';
-}
 
 function cleanRecord(r) {
   if (!r || typeof r !== 'object') return null;
@@ -47,6 +25,7 @@ function cleanRecord(r) {
     in_stock: typeof r.in_stock === 'boolean' ? r.in_stock : null,
     merchant: clip(r.merchant, 60),
     url: safeUrl(r.url),
+    promos: clip(Array.isArray(r.promos) ? r.promos.filter((x) => typeof x === 'string').join(' · ') : r.promos, 400),
     alert: r.alert === true,
   };
 }
@@ -57,9 +36,7 @@ module.exports = async function handler(req, res) {
 
   // ── POST : enregistrer un ou plusieurs relevés ─────────────
   if (req.method === 'POST') {
-    const auth = checkToken(req);
-    if (auth === 'unconfigured') return res.status(503).json({ error: 'PRICE_TOKEN non configuré côté serveur (variable Vercel absente, trop courte ou site pas redéployé)' });
-    if (auth === 'invalid') return res.status(401).json({ error: 'Non autorisé : la clé x-api-key ne correspond pas à PRICE_TOKEN' });
+    if (!requireToken(req, res)) return;
     const body = req.body || {};
     const raw = Array.isArray(body.records) ? body.records.slice(0, 20) : [body];
     const rows = raw.map(cleanRecord);
@@ -87,8 +64,14 @@ module.exports = async function handler(req, res) {
       if (!data || data.length < 1000) break;
     }
 
+    // Liens supprimés de la watchlist → on ne montre plus leur historique
+    let watchIds = null;
+    const wl = await supabase.from('watchlist').select('id');
+    if (!wl.error) watchIds = new Set((wl.data || []).map((w) => 'w-' + w.id));
+
     const products = {};
     for (const r of all) {
+      if (watchIds && r.product.startsWith('w-') && !watchIds.has(r.product)) continue;
       const p = (products[r.product] ||= { id: r.product, label: r.product, sources: {} });
       if (r.product_label) p.label = r.product_label;
       const s = (p.sources[r.source] ||= { id: r.source, label: r.source, rows: [] });
@@ -112,7 +95,7 @@ module.exports = async function handler(req, res) {
         }
         return {
           id: s.id, label: s.label,
-          latest: { price: last.price === null ? null : Number(last.price), in_stock: last.in_stock, merchant: last.merchant, url: last.url, alert: last.alert, checked_at: last.checked_at },
+          latest: { price: last.price === null ? null : Number(last.price), in_stock: last.in_stock, merchant: last.merchant, url: last.url, promos: last.promos, alert: last.alert, checked_at: last.checked_at },
           min: prices.length ? Math.min(...prices) : null,
           prev,
           series: [...perDay.values()].slice(-30),

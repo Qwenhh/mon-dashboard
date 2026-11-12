@@ -577,30 +577,95 @@ function priceSourceHtml(s) {
     ${sparkSvg(s.series)}
     <div class="price-value">${eur(l.price)}</div>
     <div class="price-meta">${merchant}${relTime(l.checked_at)}${delta}${min} ${link}</div>
+    ${l.promos ? `<div class="price-promos">🎁 ${esc(l.promos)}</div>` : ''}
   </div>`;
 }
+let watchItems = [];
+let priceProducts = [];
+
 async function loadPrices() {
   const box = document.getElementById('widget-prices');
   const badge = document.getElementById('tbadge-prices');
   if (!box) return;
   try {
-    const data = await fetch('/api/prices', { signal: AbortSignal.timeout(10000) }).then(r => r.json());
-    if (data.error) throw new Error(data.error);
-    const products = (data.products || []).filter(p => p.sources.length);
-    if (!products.length) {
-      box.innerHTML = '<div class="loading-msg">Aucun relevé pour l’instant — la tâche de veille n’a encore rien enregistré.</div>';
-      if (badge) badge.hidden = true;
-      return;
-    }
-    box.innerHTML = products.map(p => {
-      const alert = p.sources.some(s => s.latest.alert);
-      return `<div class="price-card${alert ? ' alert' : ''}"><div class="price-title">${alert ? '🔔' : '🏷️'} ${esc(p.label)}</div>${p.sources.map(priceSourceHtml).join('')}</div>`;
-    }).join('');
-    if (badge) badge.hidden = !products.some(p => p.sources.some(s => s.latest.alert));
+    const [pr, wl] = await Promise.all([
+      fetch('/api/prices', { signal: AbortSignal.timeout(10000) }).then(r => r.json()),
+      fetch('/api/watchlist', { signal: AbortSignal.timeout(10000), cache: 'no-store' }).then(r => r.json()).catch(() => ({ items: [] })),
+    ]);
+    if (pr.error) throw new Error(pr.error);
+    priceProducts = (pr.products || []).filter(p => p.sources.length);
+    watchItems = wl.items || [];
+    renderPrices();
+    if (badge) badge.hidden = !priceProducts.some(p => p.sources.some(s => s.latest.alert));
   } catch (e) {
     console.warn('Veille prix indisponible:', e.message);
     if (!box.querySelector('.price-card')) box.innerHTML = `<div class="error-msg">Veille prix indisponible : ${esc(e.message)}</div>`;
   }
+}
+
+function renderPrices() {
+  const box = document.getElementById('widget-prices');
+  if (!priceProducts.length) {
+    box.innerHTML = '<div class="loading-msg">Aucun relevé pour l’instant — la tâche de veille n’a encore rien enregistré.</div>';
+  } else {
+    box.innerHTML = priceProducts.map(p => {
+      const alert = p.sources.some(s => s.latest.alert);
+      return `<div class="price-card${alert ? ' alert' : ''}"><div class="price-title">${alert ? '🔔' : '🏷️'} ${esc(p.label)}</div>${p.sources.map(priceSourceHtml).join('')}</div>`;
+    }).join('');
+  }
+  renderWatchList();
+}
+
+/* ── Liens surveillés (ajout / suppression protégés par la clé PRICE_TOKEN) ── */
+const LS_PRICE_TOKEN = 'dashboard_price_token';
+function renderWatchList() {
+  const el = document.getElementById('watch-list');
+  if (!el) return;
+  if (!watchItems.length) { el.innerHTML = '<div class="loading-msg" style="padding:14px">Aucun lien. Ajoute-en un ci-dessus.</div>'; return; }
+  const hasData = id => priceProducts.some(p => p.id === 'w-' + id);
+  el.innerHTML = watchItems.map(w => {
+    let host = ''; try { host = new URL(w.url).hostname.replace(/^www\./, ''); } catch {}
+    return `<div class="watch-item">
+      <div class="watch-item-main"><div class="watch-item-name">${esc(w.label)}</div><a class="watch-item-url" href="${esc(safeUrl(w.url))}" target="_blank" rel="noopener noreferrer">${esc(host || w.url)}</a></div>
+      <span class="watch-item-status">${hasData(w.id) ? 'suivi ✓' : 'en attente du 1er relevé'}</span>
+      <button class="watch-del" title="Supprimer" onclick="removeWatch(${Number(w.id)})">✕</button>
+    </div>`;
+  }).join('');
+}
+function priceToken() {
+  let t = ''; try { t = localStorage.getItem(LS_PRICE_TOKEN) || ''; } catch {}
+  if (!t) {
+    t = (window.prompt('Clé de modification (PRICE_TOKEN) — demandée une seule fois sur cet appareil :') || '').trim();
+    if (t) { try { localStorage.setItem(LS_PRICE_TOKEN, t); } catch {} }
+  }
+  return t;
+}
+async function watchCall(body) {
+  const msg = document.getElementById('watch-msg');
+  const token = priceToken();
+  if (!token) { msg.textContent = 'Clé requise pour modifier la liste.'; return false; }
+  try {
+    const r = await fetch('/api/watchlist', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'x-api-key': token },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(10000),
+    });
+    const d = await r.json().catch(() => ({}));
+    if (r.status === 401) { try { localStorage.removeItem(LS_PRICE_TOKEN); } catch {} msg.textContent = 'Clé refusée — réessaie pour la ressaisir.'; return false; }
+    if (!r.ok) { msg.textContent = d.error || ('Erreur ' + r.status); return false; }
+    msg.textContent = '';
+    return true;
+  } catch (e) { msg.textContent = 'Erreur : ' + e.message; return false; }
+}
+async function addWatch(e) {
+  e.preventDefault();
+  const label = document.getElementById('watch-label'), url = document.getElementById('watch-url');
+  const btn = document.getElementById('watch-add-btn'); btn.disabled = true;
+  if (await watchCall({ action: 'add', label: label.value.trim(), url: url.value.trim() })) { label.value = ''; url.value = ''; await loadPrices(); }
+  btn.disabled = false;
+}
+async function removeWatch(id) {
+  if (!confirm('Supprimer ce lien et son historique de prix ?')) return;
+  if (await watchCall({ action: 'remove', id })) await loadPrices();
 }
 
 /* ══ INIT ══ */

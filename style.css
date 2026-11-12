@@ -186,8 +186,22 @@ a.article-main { display: block; text-decoration: none; color: inherit; }
 .price-value { font-size: 1.25rem; font-weight: 800; line-height: 1.1; }
 .price-meta { font-size: .68rem; color: var(--muted); }
 .price-meta a { color: var(--muted); }
-.price-spark { grid-row: 1 / span 3; grid-column: 2; justify-self: end; align-self: center; }
+.price-spark { grid-row: 1 / span 4; grid-column: 2; justify-self: end; align-self: center; }
 .price-badge { display: inline-block; font-size: .62rem; font-weight: 700; padding: 2px 7px; border-radius: 20px; margin-left: 6px; vertical-align: middle; }
 .price-badge.out { background: rgba(224,74,109,.15); color: #e04a6d; }
 .price-badge.in  { background: rgba(39,174,96,.18); color: #27ae60; }
 .price-delta.down { color: #27ae60; } .price-delta.up { color: #e04a6d; }
+.price-promos { grid-column: 1; font-size: .72rem; color: #d9a441; line-height: 1.35; }
+.watch-panel { margin-top: 22px; }
+.watch-form { display: flex; gap: 8px; flex-wrap: wrap; }
+.watch-form input { flex: 1 1 180px; min-width: 0; background: var(--surface); border: 1px solid var(--border); color: var(--text); border-radius: 8px; padding: 8px 10px; font-size: .82rem; }
+.watch-form input:focus { outline: none; border-color: var(--accent-home); }
+.watch-form button { padding: 8px 16px; }
+.watch-msg { font-size: .72rem; color: #e04a6d; min-height: 1em; margin: 6px 2px; }
+.watch-item { display: flex; align-items: center; gap: 10px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 9px 12px; margin-bottom: 6px; font-size: .8rem; }
+.watch-item-main { flex: 1; min-width: 0; }
+.watch-item-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.watch-item-url { font-size: .68rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
+.watch-item-status { font-size: .66rem; color: var(--muted); white-space: nowrap; }
+.watch-del { background: none; border: 1px solid var(--border); color: var(--muted); width: 26px; height: 26px; border-radius: 50%; cursor: pointer; }
+.watch-del:hover { color: #e04a6d; border-color: #e04a6d; }

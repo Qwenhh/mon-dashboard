@@ -118,6 +118,16 @@
   <div class="articles-page">
     <div class="mark-all-row"><button class="btn-refresh" onclick="loadPrices()">↻ Rafraîchir</button></div>
     <div class="prices-grid" id="widget-prices"><div class="loading-msg">Chargement…</div></div>
+    <div class="watch-panel">
+      <div class="section-divider">Liens surveillés</div>
+      <form class="watch-form" onsubmit="addWatch(event)">
+        <input id="watch-label" type="text" maxlength="60" placeholder="Nom (ex. Casque Sony)" required />
+        <input id="watch-url" type="url" placeholder="https://…" required />
+        <button type="submit" class="btn-mark-all" id="watch-add-btn">Ajouter</button>
+      </form>
+      <div class="watch-msg" id="watch-msg"></div>
+      <div id="watch-list"></div>
+    </div>
   </div>
 </div>
 
