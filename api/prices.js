@@ -21,12 +21,13 @@ function safeUrl(u) {
   try { const x = new URL(u); return x.protocol === 'https:' || x.protocol === 'http:' ? x.href.slice(0, 500) : null; }
   catch { return null; }
 }
-function tokenOk(req) {
-  const want = process.env.PRICE_TOKEN || '';
-  if (want.length < 16) return false; // token absent ou trop court → écriture désactivée
-  const a = Buffer.from(String(req.headers['x-api-key'] || ''));
+// Renvoie 'ok' | 'unconfigured' | 'invalid' (sans jamais révéler la valeur attendue)
+function checkToken(req) {
+  const want = String(process.env.PRICE_TOKEN || '').trim();
+  if (want.length < 16) return 'unconfigured'; // variable absente (ou pas encore redéployée) / trop courte
+  const a = Buffer.from(String(req.headers['x-api-key'] || '').trim());
   const b = Buffer.from(want);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+  return a.length === b.length && crypto.timingSafeEqual(a, b) ? 'ok' : 'invalid';
 }
 
 function cleanRecord(r) {
@@ -56,7 +57,9 @@ module.exports = async function handler(req, res) {
 
   // ── POST : enregistrer un ou plusieurs relevés ─────────────
   if (req.method === 'POST') {
-    if (!tokenOk(req)) return res.status(401).json({ error: 'Non autorisé' });
+    const auth = checkToken(req);
+    if (auth === 'unconfigured') return res.status(503).json({ error: 'PRICE_TOKEN non configuré côté serveur (variable Vercel absente, trop courte ou site pas redéployé)' });
+    if (auth === 'invalid') return res.status(401).json({ error: 'Non autorisé : la clé x-api-key ne correspond pas à PRICE_TOKEN' });
     const body = req.body || {};
     const raw = Array.isArray(body.records) ? body.records.slice(0, 20) : [body];
     const rows = raw.map(cleanRecord);
