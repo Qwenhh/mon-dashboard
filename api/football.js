@@ -5,6 +5,7 @@ const TEAMS = {
   monaco: { espn: 174, fd: 548 },
   barce:  { espn: 83,  fd: 81  },
   france: { espn: 478, fd: 773 },
+  reims:  { espn: 3243, fd: null }, // Ligue 2 — pas de secours football-data
 };
 const HOW_MANY = 2; // nombre de derniers résultats / prochains matchs affichés
 
@@ -72,6 +73,7 @@ async function fromEspn(teamId) {
 
 // ── football-data.org (secours) ───────────────────────────────
 async function fromFootballData(fdId) {
+  if (!fdId) throw new Error('Pas de source de secours pour cette équipe');
   const key = process.env.FOOTBALL_DATA_KEY;
   if (!key) throw new Error('FOOTBALL_DATA_KEY manquante');
   const headers = { 'X-Auth-Token': key };
