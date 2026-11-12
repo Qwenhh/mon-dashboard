@@ -21,6 +21,7 @@ nav::-webkit-scrollbar { display: none; }
 .tab[data-tab="biathlon"].active { border-bottom-color: var(--accent-biat); }
 .tab[data-tab="foot"].active     { border-bottom-color: var(--accent-foot); }
 .tab[data-tab="fm"].active        { border-bottom-color: var(--accent-fm); }
+.tab[data-tab="prices"].active { border-bottom-color: #27ae60; }
 .tab[data-tab="fmr"].active      { border-bottom-color: var(--accent-fmr); }
 .tab-badge { background: var(--surface2); color: var(--muted); font-size: .65rem; padding: 1px 6px; border-radius: 20px; font-weight: 700; min-width: 18px; text-align: center; }
 .tab.active .tab-badge { background: rgba(255,255,255,.08); color: var(--text); }
@@ -173,3 +174,20 @@ a.article-main { display: block; text-decoration: none; color: inherit; }
 .btn-read-modal { background: rgba(39,174,96,.15); color: #27ae60; border: 1px solid rgba(39,174,96,.3); }
 .btn-read-modal.done { background: rgba(39,174,96,.25); }
 .btn-open { background: var(--surface2); color: var(--text); border: 1px solid var(--border); text-decoration: none; text-align: center; display: flex; align-items: center; justify-content: center; gap: 5px; }
+
+/* VEILLE PRIX */
+.prices-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; }
+.price-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.price-card.alert { border-color: #27ae60; box-shadow: 0 0 0 1px rgba(39,174,96,.35); }
+.price-title { font-size: .88rem; font-weight: 700; margin-bottom: 10px; display: flex; align-items: center; gap: 6px; }
+.price-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; padding: 8px 0; border-top: 1px solid var(--border); align-items: center; }
+.price-row:first-of-type { border-top: none; padding-top: 0; }
+.price-label { font-size: .68rem; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); }
+.price-value { font-size: 1.25rem; font-weight: 800; line-height: 1.1; }
+.price-meta { font-size: .68rem; color: var(--muted); }
+.price-meta a { color: var(--muted); }
+.price-spark { grid-row: 1 / span 3; grid-column: 2; justify-self: end; align-self: center; }
+.price-badge { display: inline-block; font-size: .62rem; font-weight: 700; padding: 2px 7px; border-radius: 20px; margin-left: 6px; vertical-align: middle; }
+.price-badge.out { background: rgba(224,74,109,.15); color: #e04a6d; }
+.price-badge.in  { background: rgba(39,174,96,.18); color: #27ae60; }
+.price-delta.down { color: #27ae60; } .price-delta.up { color: #e04a6d; }

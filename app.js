@@ -201,7 +201,7 @@ async function refreshAll() {
     const data = await fetch('/api/articles?t=' + Date.now(), { cache: 'no-store' }).then(r => r.json());
     articles = data;
   } catch(e) { console.warn('Refresh articles échoué:', e); }
-  await Promise.allSettled([fetchReadStatus(), ...TEAMS.map(t => loadTeam(t))]);
+  await Promise.allSettled([fetchReadStatus(), loadPrices(), ...TEAMS.map(t => loadTeam(t))]);
   renderAll();
   updateClock();
   lastRefresh = Date.now();
@@ -550,6 +550,59 @@ async function loadTeam({teamKey,displayName,id}){
   }
 }
 
+/* ══ VEILLE PRIX — /api/prices (alimenté par la tâche planifiée) ══ */
+const eur = n => n === null || n === undefined ? '—' : Number(n).toLocaleString('fr-FR', { minimumFractionDigits: Number.isInteger(Number(n)) ? 0 : 2, maximumFractionDigits: 2 }) + ' €';
+function sparkSvg(series) {
+  if (!series || series.length < 2) return '';
+  const w = 84, h = 28, min = Math.min(...series), max = Math.max(...series), span = max - min || 1;
+  const pts = series.map((v, i) => (i / (series.length - 1) * w).toFixed(1) + ',' + (h - 3 - (v - min) / span * (h - 6)).toFixed(1)).join(' ');
+  const down = series[series.length - 1] < series[0];
+  return `<svg class="price-spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}"><polyline points="${pts}" fill="none" stroke="${down ? '#27ae60' : 'var(--muted)'}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+function priceSourceHtml(s) {
+  const l = s.latest;
+  let badge = '';
+  if (l.in_stock === false) badge = '<span class="price-badge out">Rupture</span>';
+  else if (l.in_stock === true) badge = '<span class="price-badge in">Dispo</span>';
+  let delta = '';
+  if (l.price !== null && s.prev !== null && s.prev !== l.price) {
+    const d = l.price - s.prev;
+    delta = ` · <span class="price-delta ${d < 0 ? 'down' : 'up'}">${d < 0 ? '▼' : '▲'} ${eur(Math.abs(d))}</span>`;
+  }
+  const min = s.min !== null && s.min !== l.price ? ` · plus bas 30j : ${eur(s.min)}` : '';
+  const link = l.url ? `<a href="${esc(safeUrl(l.url))}" target="_blank" rel="noopener noreferrer">voir ↗</a>` : '';
+  const merchant = l.merchant ? esc(l.merchant) + ' · ' : '';
+  return `<div class="price-row">
+    <div class="price-label">${esc(s.label)}${badge}</div>
+    ${sparkSvg(s.series)}
+    <div class="price-value">${eur(l.price)}</div>
+    <div class="price-meta">${merchant}${relTime(l.checked_at)}${delta}${min} ${link}</div>
+  </div>`;
+}
+async function loadPrices() {
+  const box = document.getElementById('widget-prices');
+  const badge = document.getElementById('tbadge-prices');
+  if (!box) return;
+  try {
+    const data = await fetch('/api/prices', { signal: AbortSignal.timeout(10000) }).then(r => r.json());
+    if (data.error) throw new Error(data.error);
+    const products = (data.products || []).filter(p => p.sources.length);
+    if (!products.length) {
+      box.innerHTML = '<div class="loading-msg">Aucun relevé pour l’instant — la tâche de veille n’a encore rien enregistré.</div>';
+      if (badge) badge.hidden = true;
+      return;
+    }
+    box.innerHTML = products.map(p => {
+      const alert = p.sources.some(s => s.latest.alert);
+      return `<div class="price-card${alert ? ' alert' : ''}"><div class="price-title">${alert ? '🔔' : '🏷️'} ${esc(p.label)}</div>${p.sources.map(priceSourceHtml).join('')}</div>`;
+    }).join('');
+    if (badge) badge.hidden = !products.some(p => p.sources.some(s => s.latest.alert));
+  } catch (e) {
+    console.warn('Veille prix indisponible:', e.message);
+    if (!box.querySelector('.price-card')) box.innerHTML = `<div class="error-msg">Veille prix indisponible : ${esc(e.message)}</div>`;
+  }
+}
+
 /* ══ INIT ══ */
 function updateClock(){ document.getElementById('last-update').textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit'}); renderAll(); }
 updateClock(); setInterval(updateClock,60000);
@@ -578,6 +631,7 @@ Promise.allSettled([
   loadFinance('WPEA.PA',       'IE0002XZSHO1', 'widget-msci', '📈 MSCI World PEA', '€'),
   loadFinance('ALCPB.PA',      'FR0011053636', 'widget-capb', '📊 Capital B',  '€'),
   loadF1GP(),
+  loadPrices(),
   ...TEAMS.map(t=>loadTeam(t)),
 ]);
 

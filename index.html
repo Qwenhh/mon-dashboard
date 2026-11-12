@@ -26,6 +26,7 @@
   <button class="tab" data-tab="foot">⚽ L'Équipe <span class="tab-badge" id="tbadge-foot">…</span></button>
   <button class="tab" data-tab="fm">🔵 Footmercato <span class="tab-badge" id="tbadge-fm">…</span></button>
   <button class="tab" data-tab="fmr">📖 Barça Reader <span class="tab-badge" id="tbadge-fmr">…</span></button>
+  <button class="tab" data-tab="prices">🏷️ Prix <span class="tab-badge" id="tbadge-prices" hidden>🔔</span></button>
   <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Basculer mode clair/sombre">☀️</button>
 </nav>
 
@@ -109,6 +110,14 @@
   <div class="articles-page">
     <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-fmr" onclick="markAllToggle(['fm'])">Tout marquer comme lu</button><button class="btn-unread-filter" onclick="toggleUnreadFilter()">Non lus seulement</button><button class="btn-refresh" onclick="refreshAll()">↻ Rafraîchir</button></div>
     <div id="list-fmr"><div class="loading-msg">Chargement…</div></div>
+  </div>
+</div>
+
+<!-- PRIX -->
+<div class="page" id="page-prices">
+  <div class="articles-page">
+    <div class="mark-all-row"><button class="btn-refresh" onclick="loadPrices()">↻ Rafraîchir</button></div>
+    <div class="prices-grid" id="widget-prices"><div class="loading-msg">Chargement…</div></div>
   </div>
 </div>
 
