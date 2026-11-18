@@ -27,6 +27,10 @@ function relTime(iso) {
   if (h < 24) return `il y a ${h}h`;
   return `il y a ${Math.floor(h/24)}j`;
 }
+// Une seule date : relative si récent (< 24 h), sinon la date complète
+function articleWhen(iso) {
+  return Date.now() - new Date(iso).getTime() < 24 * 3600 * 1000 ? relTime(iso) : pubDate(iso);
+}
 function pubDate(iso) {
   const d = new Date(iso);
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ' · ' +
@@ -43,9 +47,9 @@ function renderSyncStatus() {
   if (!el) return;
   const pending = syncQueueLoad().length;
   if (!supabaseOk)
-    el.innerHTML = ' · <span style="color:#e04a6d;font-size:.68rem" title="Supabase indisponible">⚠️ Hors ligne</span>';
+    el.innerHTML = ' · <span style="color:#e04a6d;font-size:.75rem" title="Supabase indisponible">⚠️ Hors ligne</span>';
   else if (pending)
-    el.innerHTML = ` · <span style="color:#f0c040;font-size:.68rem" title="${pending} sync(s) en attente">⏳ ${pending} en attente</span>`;
+    el.innerHTML = ` · <span style="color:#f0c040;font-size:.75rem" title="${pending} sync(s) en attente">⏳ ${pending} en attente</span>`;
   else
     el.innerHTML = '';
 }
@@ -240,7 +244,7 @@ function renderList(containerId, cats, readerMode = false) {
     const text = esc(a.title || a.content || '');
     const isLink = !readerMode && (a.label === 'leq' || a.label === 'fm');
     const mode = readerMode ? 'reader' : isLink ? 'link' : 'modal';
-    const meta = `<div class="article-source-row">${tagHtml(a)}<span class="article-time">${relTime(a.date)}</span><span class="article-time" style="margin-left:auto;opacity:.6">${pubDate(a.date)}</span></div>
+    const meta = `<div class="article-source-row">${tagHtml(a)}<span class="article-time" title="${esc(pubDate(a.date))}">${articleWhen(a.date)}</span></div>
         <div class="article-text">${text}</div>`;
     const main = isLink
       ? `<a class="article-main" href="${esc(safeUrl(a.link))}" target="_blank" rel="noopener noreferrer">${meta}</a>`
@@ -283,16 +287,6 @@ function renderBadges() {
   });
 }
 
-function renderHomePreviews() {
-  const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'] };
-  Object.entries(g).forEach(([k,cats]) => {
-    const el = document.getElementById('home-preview-'+k);
-    if (!el) return;
-    const items = cats.flatMap(c => articles[c]||[]).filter(a=>!readIds.has(a.id)).slice(0,3);
-    el.innerHTML = items.map(a=>`<div class="home-preview-item">${esc((a.title||a.content||'').slice(0,65))}…</div>`).join('');
-  });
-}
-
 function renderMarkAllBtns() {
   const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'], fm:['fm'], fmr:['fm'] };
   Object.entries(g).forEach(([k, cats]) => {
@@ -312,7 +306,6 @@ function renderAll() {
   renderList('list-fm',       ['fm']);
   renderList('list-fmr',      ['fm'], true);
   renderBadges();
-  renderHomePreviews();
   renderMarkAllBtns();
 }
 
@@ -412,9 +405,11 @@ document.querySelectorAll('.tab').forEach(btn => {
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('page-'+btn.dataset.tab).classList.add('active');
+    btn.scrollIntoView({ block: 'nearest', inline: 'center' });
+    window.scrollTo(0, 0);
   });
 });
-document.querySelectorAll('.home-card').forEach(card => {
+document.querySelectorAll('.home-chip').forEach(card => {
   card.addEventListener('click', () => document.querySelector(`.tab[data-tab="${card.dataset.goto}"]`).click());
 });
 
@@ -463,12 +458,12 @@ async function loadFinance(ticker, isin, elementId, label, currency) {
       <div class="widget-label">${label}</div>
       <div class="widget-main">${d.price.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} ${currency}</div>
       ${d.change!==null?`<div class="widget-change ${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(d.change).toFixed(2)}%</div>`:''}
-      <div class="widget-sub" style="font-size:.62rem;margin-top:4px">${isin}</div>`;
+      <div class="widget-sub" style="font-size:.75rem;margin-top:4px">${isin}</div>`;
   } catch {
     el.innerHTML = `
       <div class="widget-label">${label}</div>
       <a class="widget-link" style="margin-top:12px" href="https://finance.yahoo.com/quote/${ticker}" target="_blank">Voir le cours →</a>
-      <div class="widget-sub" style="font-size:.62rem;margin-top:4px">${isin}</div>`;
+      <div class="widget-sub" style="font-size:.75rem;margin-top:4px">${isin}</div>`;
   }
 }
 
@@ -514,19 +509,25 @@ const TEAMS=[
   {teamKey:'france', displayName:'Équipe de France', id:'team-france'},
 ];
 function frDate(iso){ if(!iso)return''; const dt=new Date(iso); return dt.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',timeZone:'Europe/Paris'})+' · '+dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Paris'}); }
+function shortDate(iso, withTime){
+  if(!iso) return '';
+  const dt=new Date(iso);
+  const d=dt.toLocaleDateString('fr-FR',{day:'numeric',month:'short',timeZone:'Europe/Paris'});
+  return withTime ? d+' · '+dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Paris'}) : d;
+}
 function teamMatchHtml(m, kind){
-  const venue = m.isHome ? '🏠 ' : '✈️ ';
-  const comp = m.competition ? `<span class="comp-text">${esc(m.competition)}</span>` : '';
-  let info;
+  const comp = (m.competition||'').replace(/^UEFA\s+/,'');
+  const left = `<div class="team-match-teams" title="${esc(frDate(m.utcDate))}">${m.isHome?'🏠':'✈️'} ${esc(m.opponent)}${comp?`<span class="comp-text">${esc(comp)}</span>`:''}</div>`;
+  let side;
   if (kind === 'live') {
-    info = `<span class="result-badge" style="background:rgba(224,74,109,.2);color:#e04a6d">🔴 EN DIRECT${m.clock?' '+esc(m.clock):''}</span><span class="score-text">${m.myScore ?? 0} – ${m.oppScore ?? 0}</span>`;
+    side = `<span class="result-badge" style="background:rgba(224,74,109,.2);color:#e04a6d">🔴${m.clock?' '+esc(m.clock):''}</span><span class="score-text">${m.myScore ?? 0} – ${m.oppScore ?? 0}</span>`;
   } else if (kind === 'last') {
     const res = m.myScore > m.oppScore ? 'V' : m.myScore < m.oppScore ? 'D' : 'N';
-    info = `<span class="result-badge result-${res}">${res}</span><span class="score-text">${m.myScore} – ${m.oppScore}${m.shootout?' (tab)':''}</span><span class="comp-text">${frDate(m.utcDate)}</span>`;
+    side = `<span class="comp-text">${shortDate(m.utcDate)}</span><span class="result-badge result-${res}">${res}</span><span class="score-text">${m.myScore} – ${m.oppScore}${m.shootout?' tab':''}</span>`;
   } else {
-    info = `<span class="comp-text">${frDate(m.utcDate)}</span>`;
+    side = `<span class="score-text">${shortDate(m.utcDate, true)}</span>`;
   }
-  return `<div class="team-match"><div class="team-match-teams">${venue}vs ${esc(m.opponent)}</div><div class="team-match-info">${info}</div><div class="team-match-info" style="margin-top:2px">${comp}</div></div>`;
+  return `<div class="team-match">${left}<div class="team-match-side">${side}</div></div>`;
 }
 async function loadTeam({teamKey,displayName,id}){
   const el=document.getElementById(id);
