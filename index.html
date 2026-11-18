@@ -14,62 +14,93 @@
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
   <link rel="stylesheet" href="/style.css" />
 </head>
-<body>
+<body data-mview="home">
 <script>try{if(localStorage.getItem('dashboard_theme')==='light')document.body.classList.add('light')}catch(e){}</script>
 
+<!-- Barre du haut : onglets sur ordinateur, titre seul sur téléphone -->
 <nav>
-  <div class="nav-logo">📰 Dashboard</div>
-  <button class="tab active" data-tab="home">🏠 Accueil</button>
-  <button class="tab" data-tab="fun">😂 Autres <span class="tab-badge" id="tbadge-fun">…</span></button>
-  <button class="tab" data-tab="f1">🏎️ F1 <span class="tab-badge" id="tbadge-f1">…</span></button>
-  <button class="tab" data-tab="biathlon">🎯 Biathlon <span class="tab-badge" id="tbadge-biathlon">…</span></button>
-  <button class="tab" data-tab="foot">⚽ L'Équipe <span class="tab-badge" id="tbadge-foot">…</span></button>
-  <button class="tab" data-tab="fm">🔵 Footmercato <span class="tab-badge" id="tbadge-fm">…</span></button>
-  <button class="tab" data-tab="fmr">📖 Barça Reader <span class="tab-badge" id="tbadge-fmr">…</span></button>
-  <button class="tab" data-tab="prices">🏷️ Prix <span class="tab-badge" id="tbadge-prices" hidden>🔔</span></button>
-  <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Basculer mode clair/sombre">☀️</button>
+  <div class="nav-logo">Dashboard</div>
+  <button class="tab active" data-tab="home">Accueil</button>
+  <button class="tab" data-tab="fun">Autres <span class="tab-badge" id="tbadge-fun">…</span></button>
+  <button class="tab" data-tab="f1">F1 <span class="tab-badge" id="tbadge-f1">…</span></button>
+  <button class="tab" data-tab="biathlon">Biathlon <span class="tab-badge" id="tbadge-biathlon">…</span></button>
+  <button class="tab" data-tab="foot">L'Équipe <span class="tab-badge" id="tbadge-foot">…</span></button>
+  <button class="tab" data-tab="fm">Footmercato <span class="tab-badge" id="tbadge-fm">…</span></button>
+  <button class="tab" data-tab="fmr">Barça Reader <span class="tab-badge" id="tbadge-fmr">…</span></button>
+  <button class="tab" data-tab="prices">Prix <span class="tab-badge tab-badge-alert" id="tbadge-prices" hidden>!</span></button>
+  <button class="btn-theme" id="btn-theme" onclick="toggleTheme()" title="Basculer mode clair/sombre" aria-label="Basculer mode clair/sombre"></button>
 </nav>
 
-<!-- ACCUEIL -->
+<!-- Filtres d'articles (téléphone uniquement) -->
+<div class="article-filters" id="article-filters">
+  <button class="filter-chip" data-tab="all">Tous <span id="fbadge-all">…</span></button>
+  <button class="filter-chip" data-tab="foot">L'Équipe <span id="fbadge-foot">…</span></button>
+  <button class="filter-chip" data-tab="fmr">Barça <span id="fbadge-fmr">…</span></button>
+  <button class="filter-chip" data-tab="f1">F1 <span id="fbadge-f1">…</span></button>
+  <button class="filter-chip" data-tab="biathlon">Biathlon <span id="fbadge-biathlon">…</span></button>
+  <button class="filter-chip" data-tab="fun">Autres <span id="fbadge-fun">…</span></button>
+</div>
+
+<!-- ACCUEIL (+ vue Scores sur téléphone) -->
 <div class="page active" id="page-home">
   <div class="home-content">
 
-    <div class="section-divider">En direct</div>
-    <div class="widgets-row">
-      <div class="widget-card" id="widget-meteo"><div class="widget-label">🌍 Lille</div><div class="skeleton skel-main"></div><div class="skeleton skel-sub" style="margin-top:6px"></div></div>
-      <div class="widget-card" id="widget-btc"><div class="widget-label">₿ Bitcoin</div><div class="skeleton skel-main"></div><div class="skeleton skel-sub" style="margin-top:6px"></div></div>
-      <div class="widget-card" id="widget-msci"><div class="widget-label">📈 MSCI World</div><div class="skeleton skel-main"></div><div class="skeleton skel-sub" style="margin-top:6px"></div></div>
-      <div class="widget-card" id="widget-capb"><div class="widget-label">📊 Capital B</div><div class="skeleton skel-main"></div><div class="skeleton skel-sub" style="margin-top:6px"></div></div>
+    <div class="home-sec sec-widgets">
+      <div class="section-divider">En direct</div>
+      <div class="widgets-row">
+        <div class="widget-card" id="widget-meteo"><div class="widget-label">Lille</div><div class="skeleton skel-main"></div><div class="skeleton skel-sub" style="margin-top:6px"></div></div>
+        <div class="widget-card" id="widget-btc"><div class="widget-label">Bitcoin</div><div class="skeleton skel-main"></div><div class="skeleton skel-sub" style="margin-top:6px"></div></div>
+        <div class="widget-card" id="widget-msci"><div class="widget-label">MSCI World</div><div class="skeleton skel-main"></div><div class="skeleton skel-sub" style="margin-top:6px"></div></div>
+        <div class="widget-card" id="widget-capb"><div class="widget-label">Capital B</div><div class="skeleton skel-main"></div><div class="skeleton skel-sub" style="margin-top:6px"></div></div>
+      </div>
     </div>
 
-    <div class="section-divider">Prochain GP · Formule 1</div>
-    <div class="gp-card" id="widget-gp"><div class="gp-empty">Chargement…</div></div>
-
-    <div class="section-divider">Mes équipes</div>
-    <div class="teams-row">
-      <div class="team-card" id="team-monaco"><div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">AS Monaco</span></div><div class="widget-sub">Chargement…</div></div>
-      <div class="team-card" id="team-barce"><div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">FC Barcelone</span></div><div class="widget-sub">Chargement…</div></div>
-      <div class="team-card" id="team-reims"><div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">Stade de Reims</span></div><div class="widget-sub">Chargement…</div></div>
-      <div class="team-card" id="team-france"><div class="team-header"><span style="font-size:1.3rem">🇫🇷</span><span class="team-name">Équipe de France</span></div><div class="widget-sub">Chargement…</div></div>
+    <!-- Résumé (téléphone uniquement) : une ligne par domaine -->
+    <div class="home-sec sec-summary">
+      <div class="section-divider">En bref</div>
+      <div class="summary-card" id="home-summary"></div>
     </div>
 
-    <div class="section-divider">Articles à lire</div>
-    <div class="home-chips">
-      <button class="home-chip" data-goto="fun">😂 Autres <span class="home-chip-count" id="home-count-fun">…</span></button>
-      <button class="home-chip" data-goto="f1">🏎️ F1 <span class="home-chip-count" id="home-count-f1">…</span></button>
-      <button class="home-chip" data-goto="biathlon">🎯 Biathlon <span class="home-chip-count" id="home-count-biathlon">…</span></button>
-      <button class="home-chip" data-goto="foot">⚽ L'Équipe <span class="home-chip-count" id="home-count-foot">…</span></button>
-      <button class="home-chip" data-goto="fm">🔵 Barça <span class="home-chip-count" id="home-count-fm">…</span></button>
+    <div class="home-sec sec-scores">
+      <div class="section-divider">Prochain GP · Formule 1</div>
+      <div class="gp-card" id="widget-gp"><div class="gp-empty">Chargement…</div></div>
+
+      <div class="section-divider">Mes équipes</div>
+      <div class="teams-row">
+        <div class="team-card" id="team-monaco"><div class="team-header"><span class="team-name">AS Monaco</span></div><div class="widget-sub">Chargement…</div></div>
+        <div class="team-card" id="team-barce"><div class="team-header"><span class="team-name">FC Barcelone</span></div><div class="widget-sub">Chargement…</div></div>
+        <div class="team-card" id="team-reims"><div class="team-header"><span class="team-name">Stade de Reims</span></div><div class="widget-sub">Chargement…</div></div>
+        <div class="team-card" id="team-france"><div class="team-header"><span class="team-name">Équipe de France</span></div><div class="widget-sub">Chargement…</div></div>
+      </div>
+    </div>
+
+    <div class="home-sec sec-chips">
+      <div class="section-divider">Articles à lire</div>
+      <div class="home-chips">
+        <button class="home-chip" data-goto="fun">Autres <span class="home-chip-count" id="home-count-fun">…</span></button>
+        <button class="home-chip" data-goto="f1">F1 <span class="home-chip-count" id="home-count-f1">…</span></button>
+        <button class="home-chip" data-goto="biathlon">Biathlon <span class="home-chip-count" id="home-count-biathlon">…</span></button>
+        <button class="home-chip" data-goto="foot">L'Équipe <span class="home-chip-count" id="home-count-foot">…</span></button>
+        <button class="home-chip" data-goto="fm">Barça <span class="home-chip-count" id="home-count-fm">…</span></button>
+      </div>
     </div>
 
     <div class="refresh-row"><div class="dot-live"></div>Mise à jour : <strong id="last-update">--:--</strong><span id="sync-status"></span> · <button class="btn-refresh" id="btn-refresh" onclick="refreshAll()">↻ Rafraîchir</button></div>
   </div>
 </div>
 
-<!-- FUN -->
+<!-- TOUS LES ARTICLES (téléphone) -->
+<div class="page" id="page-all">
+  <div class="articles-page">
+    <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-all" onclick="markAllToggle(ALL_CATS)">Tout marquer comme lu</button><button class="btn-unread-filter" onclick="toggleUnreadFilter()">Non lus seulement</button><button class="btn-refresh" onclick="refreshAll()">↻ Rafraîchir</button></div>
+    <div id="list-all"><div class="loading-msg">Chargement…</div></div>
+  </div>
+</div>
+
+<!-- AUTRES -->
 <div class="page" id="page-fun">
   <div class="articles-page fun-tab">
-    <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-fun" onclick="markAllToggle(['fun'])">Tout marquer comme lu</button><button class="btn-unread-filter" onclick="toggleUnreadFilter()">Non lus seulement</button></div>
+    <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-fun" onclick="markAllToggle(['fun'])">Tout marquer comme lu</button><button class="btn-unread-filter" onclick="toggleUnreadFilter()">Non lus seulement</button><button class="btn-refresh" onclick="refreshAll()">↻ Rafraîchir</button></div>
     <div id="list-fun"><div class="loading-msg">Chargement…</div></div>
   </div>
 </div>
@@ -90,7 +121,7 @@
   </div>
 </div>
 
-<!-- FOOT -->
+<!-- L'ÉQUIPE FOOT -->
 <div class="page" id="page-foot">
   <div class="articles-page">
     <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-foot" onclick="markAllToggle(['foot'])">Tout marquer comme lu</button><button class="btn-unread-filter" onclick="toggleUnreadFilter()">Non lus seulement</button><button class="btn-refresh" onclick="refreshAll()">↻ Rafraîchir</button></div>
@@ -106,7 +137,7 @@
   </div>
 </div>
 
-<!-- FOOTMERCATO READER -->
+<!-- BARÇA READER -->
 <div class="page" id="page-fmr">
   <div class="articles-page">
     <div class="mark-all-row"><button class="btn-mark-all" id="btn-markall-fmr" onclick="markAllToggle(['fm'])">Tout marquer comme lu</button><button class="btn-unread-filter" onclick="toggleUnreadFilter()">Non lus seulement</button><button class="btn-refresh" onclick="refreshAll()">↻ Rafraîchir</button></div>
@@ -130,6 +161,14 @@
       <div id="watch-list"></div>
     </div>
   </div>
+</div>
+
+<!-- Barre du bas (téléphone uniquement) -->
+<div class="bottom-nav" role="navigation" aria-label="Navigation principale">
+  <button class="bnav active" data-view="home"><i data-icon="home" data-size="22"></i>Accueil</button>
+  <button class="bnav" data-view="articles"><i data-icon="news" data-size="22"></i>Articles</button>
+  <button class="bnav" data-view="scores"><i data-icon="award" data-size="22"></i>Scores</button>
+  <button class="bnav" data-view="prices"><i data-icon="tag" data-size="22"></i>Prix</button>
 </div>
 
 <!-- MODAL -->

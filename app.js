@@ -1,9 +1,34 @@
+/* ══ ICÔNES (pictogrammes au trait, style Feather) ══ */
+const ICONS = {
+  home:    '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
+  news:    '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>',
+  award:   '<circle cx="12" cy="8" r="7"/><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>',
+  tag:     '<path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/>',
+  bell:    '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
+  gift:    '<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/>',
+  flag:    '<path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/>',
+  plane:   '<polygon points="3 11 22 2 13 21 11 13 3 11"/>',
+  chevron: '<polyline points="9 18 15 12 9 6"/>',
+  sun:     '<circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>',
+  moon:    '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+};
+function icon(name, size = 16) {
+  return `<svg class="ic" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[name] || ''}</svg>`;
+}
+// Icônes déclarées dans le HTML : <i data-icon="home" data-size="22"></i>
+document.querySelectorAll('[data-icon]').forEach(el => { el.outerHTML = icon(el.dataset.icon, Number(el.dataset.size) || 16); });
+
+/* ══ ÉTAT PARTAGÉ (résumé d'accueil, vue "Tous") ══ */
+const ALL_CATS = ['foot', 'fm', 'f1', 'biathlon', 'fun'];
+const teamData = {};   // teamKey → { name, live, next[] }
+let gpInfo = null;     // { name, iso }
+
 /* ══ THEME ══ */
 const LS_THEME = 'dashboard_theme';
 function applyTheme(t) {
   document.body.classList.toggle('light', t === 'light');
   const btn = document.getElementById('btn-theme');
-  if (btn) btn.textContent = t === 'light' ? '🌙' : '☀️';
+  if (btn) btn.innerHTML = icon(t === 'light' ? 'moon' : 'sun', 18);
 }
 function toggleTheme() {
   const next = document.body.classList.contains('light') ? 'dark' : 'light';
@@ -47,9 +72,9 @@ function renderSyncStatus() {
   if (!el) return;
   const pending = syncQueueLoad().length;
   if (!supabaseOk)
-    el.innerHTML = ' · <span style="color:#e04a6d;font-size:.75rem" title="Supabase indisponible">⚠️ Hors ligne</span>';
+    el.innerHTML = ' · <span style="color:#e04a6d;font-size:.75rem" title="Supabase indisponible">Hors ligne</span>';
   else if (pending)
-    el.innerHTML = ` · <span style="color:#f0c040;font-size:.75rem" title="${pending} sync(s) en attente">⏳ ${pending} en attente</span>`;
+    el.innerHTML = ` · <span style="color:#f0c040;font-size:.75rem" title="${pending} sync(s) en attente">${pending} en attente</span>`;
   else
     el.innerHTML = '';
 }
@@ -233,17 +258,20 @@ function renderList(containerId, cats, readerMode = false) {
   const c = document.getElementById(containerId);
   if (!c) return;
   let items = cats.flatMap(cat => articles[cat] || []);
+  if (cats.length > 1) items.sort((a, b) => new Date(b.date) - new Date(a.date));
   if (unreadOnly) items = items.filter(a => !readIds.has(a.id));
   if (!items.length) {
-    c.innerHTML = `<div class="loading-msg">${unreadOnly ? 'Tout est lu 🎉' : 'Aucun article disponible.'}</div>`;
+    c.innerHTML = `<div class="loading-msg">${unreadOnly ? 'Tout est lu' : 'Aucun article disponible.'}</div>`;
     return;
   }
 
   c.innerHTML = items.map(a => {
     const read = readIds.has(a.id);
     const text = esc(a.title || a.content || '');
-    const isLink = !readerMode && (a.label === 'leq' || a.label === 'fm');
-    const mode = readerMode ? 'reader' : isLink ? 'link' : 'modal';
+    // readerMode : true = tout en lecteur intégré ; 'fm' = seulement les articles Footmercato
+    const reader = readerMode === true || (readerMode === 'fm' && a.label === 'fm');
+    const isLink = !reader && (a.label === 'leq' || a.label === 'fm');
+    const mode = reader ? 'reader' : isLink ? 'link' : 'modal';
     const meta = `<div class="article-source-row">${tagHtml(a)}<span class="article-time" title="${esc(pubDate(a.date))}">${articleWhen(a.date)}</span></div>
         <div class="article-text">${text}</div>`;
     const main = isLink
@@ -277,18 +305,20 @@ function unreadCount(cats) {
 }
 
 function renderBadges() {
-  const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'], fm:['fm'], fmr:['fm'] };
+  const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'], fm:['fm'], fmr:['fm'], all:ALL_CATS };
   Object.entries(g).forEach(([k,cats]) => {
     const n = unreadCount(cats);
     const badge = document.getElementById('tbadge-'+k);
     const count = document.getElementById('home-count-'+k);
     if (badge) badge.textContent = n;
     if (count) count.textContent = n;
+    const fb = document.getElementById('fbadge-'+k);
+    if (fb) fb.textContent = n;
   });
 }
 
 function renderMarkAllBtns() {
-  const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'], fm:['fm'], fmr:['fm'] };
+  const g = { fun:['fun'], f1:['f1'], biathlon:['biathlon'], foot:['foot'], fm:['fm'], fmr:['fm'], all:ALL_CATS };
   Object.entries(g).forEach(([k, cats]) => {
     const btn = document.getElementById('btn-markall-' + k);
     if (!btn) return;
@@ -305,6 +335,8 @@ function renderAll() {
   renderList('list-foot',     ['foot']);
   renderList('list-fm',       ['fm']);
   renderList('list-fmr',      ['fm'], true);
+  renderList('list-all',      ALL_CATS, 'fm');
+  renderHomeSummary();
   renderBadges();
   renderMarkAllBtns();
 }
@@ -399,19 +431,72 @@ function closeModalDirect() { document.getElementById('modal-overlay').classList
 document.addEventListener('keydown', e => { if (e.key==='Escape') closeModalDirect(); });
 
 /* ══ TABS ══ */
-document.querySelectorAll('.tab').forEach(btn => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
-    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('page-'+btn.dataset.tab).classList.add('active');
-    btn.scrollIntoView({ block: 'nearest', inline: 'center' });
-    window.scrollTo(0, 0);
-  });
+// Une seule fonction pour changer de page, quel que soit le déclencheur :
+// onglets du haut (ordinateur), barre du bas + filtres (téléphone), raccourcis de l'accueil.
+// `view` = entrée active de la barre du bas : home | articles | scores | prices
+let lastArticleTab = 'all';
+function showTab(tab, view) {
+  const mview = view || (tab === 'home' ? 'home' : tab === 'prices' ? 'prices' : 'articles');
+  document.body.dataset.mview = mview;
+  if (mview === 'articles') lastArticleTab = tab;
+
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.page').forEach(p => p.classList.toggle('active', p.id === 'page-' + tab));
+  // Sur téléphone, Footmercato et Barça Reader sont fusionnés dans le filtre "Barça"
+  const chipTab = tab === 'fm' ? 'fmr' : tab;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c.dataset.tab === chipTab));
+  document.querySelectorAll('.bnav').forEach(b => b.classList.toggle('active', b.dataset.view === mview));
+
+  document.querySelector('.tab.active')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  document.querySelector('.filter-chip.active')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  window.scrollTo(0, 0);
+}
+function goView(view) {
+  if (view === 'home') showTab('home', 'home');
+  else if (view === 'scores') showTab('home', 'scores');
+  else if (view === 'prices') showTab('prices');
+  else showTab(lastArticleTab);
+}
+document.addEventListener('click', e => {
+  const t = e.target.closest('.tab, .filter-chip');
+  if (t) return showTab(t.dataset.tab);
+  const g = e.target.closest('[data-goto]');
+  if (g) return showTab(g.dataset.goto);
+  const v = e.target.closest('[data-view]');
+  if (v) return goView(v.dataset.view);
 });
-document.querySelectorAll('.home-chip').forEach(card => {
-  card.addEventListener('click', () => document.querySelector(`.tab[data-tab="${card.dataset.goto}"]`).click());
-});
+
+/* ══ RÉSUMÉ D'ACCUEIL (téléphone) : une ligne par domaine ══ */
+function renderHomeSummary() {
+  const el = document.getElementById('home-summary');
+  if (!el) return;
+  const row = (view, ic, label, right) =>
+    `<button class="summary-row" data-view="${view}">${icon(ic, 18)}<span class="summary-label">${label}</span><span class="summary-right">${right}</span>${icon('chevron', 16)}</button>`;
+  const rows = [row('articles', 'news', 'Articles non lus', `<strong>${unreadCount(ALL_CATS)}</strong>`)];
+
+  // Match en cours, sinon le prochain match le plus proche, toutes équipes confondues
+  const cands = Object.values(teamData)
+    .map(t => { const m = t.live || t.next[0]; return m ? { t, m, live: !!t.live } : null; })
+    .filter(Boolean)
+    .sort((a, b) => (b.live - a.live) || (new Date(a.m.utcDate) - new Date(b.m.utcDate)));
+  if (cands.length) {
+    const { t, m, live } = cands[0];
+    const me = esc(t.name.replace(/^(AS|FC|Stade de|Équipe de)\s+/, '')), opp = esc(m.opponent);
+    const label = m.isHome ? `${me} – ${opp}` : `${opp} – ${me}`;
+    const my = m.myScore ?? 0, op = m.oppScore ?? 0;
+    const right = live
+      ? `<span class="live-dot"></span><strong>${m.isHome ? `${my} – ${op}` : `${op} – ${my}`}</strong>`
+      : shortDate(m.utcDate, true);
+    rows.push(row('scores', 'award', label, right));
+  }
+  if (gpInfo && !isNaN(new Date(gpInfo.iso))) rows.push(row('scores', 'flag', esc(gpInfo.name), shortDate(gpInfo.iso, true)));
+  if (priceProducts.length) {
+    const alert = priceProducts.some(p => p.sources.some(s => s.latest.alert));
+    const k = priceProducts.length;
+    rows.push(row('prices', alert ? 'bell' : 'tag', 'Veille prix', alert ? '<strong>Alerte</strong>' : `${k} produit${k > 1 ? 's' : ''}`));
+  }
+  el.innerHTML = rows.join('');
+}
 
 /* ══ MÉTÉO — Open-Meteo ══ */
 const WMO = {
@@ -428,11 +513,11 @@ async function loadWeather() {
     const d = await (await fetch('https://api.open-meteo.com/v1/forecast?latitude=50.6292&longitude=3.0573&current=temperature_2m,weather_code,wind_speed_10m&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&forecast_days=1&timezone=Europe%2FParis')).json();
     const c=d.current, daily=d.daily, [icon,desc]=WMO[c.weather_code]||['🌡️',''];
     document.getElementById('widget-meteo').innerHTML = `
-      <div class="widget-label">🌍 Lille</div><div class="widget-icon">${icon}</div>
+      <div class="widget-label">Lille</div><div class="widget-icon">${icon}</div>
       <div class="widget-main">${Math.round(c.temperature_2m)}°C</div>
       <div class="widget-sub">${desc} · ${Math.round(daily.temperature_2m_min[0])}–${Math.round(daily.temperature_2m_max[0])}°C</div>
-      <div class="widget-sub" style="margin-top:2px">💨 ${Math.round(c.wind_speed_10m)} km/h · 🌧 ${daily.precipitation_probability_max[0]}%</div>`;
-  } catch { document.getElementById('widget-meteo').innerHTML = `<div class="widget-label">🌍 Lille</div><div class="widget-sub" style="margin-top:8px">Indisponible</div><a class="widget-link" href="https://www.google.com/search?q=meteo+Lille" target="_blank">Voir sur Google →</a>`; }
+      <div class="widget-sub" style="margin-top:2px">Vent ${Math.round(c.wind_speed_10m)} km/h · Pluie ${daily.precipitation_probability_max[0]} %</div>`;
+  } catch { document.getElementById('widget-meteo').innerHTML = `<div class="widget-label">Lille</div><div class="widget-sub" style="margin-top:8px">Indisponible</div><a class="widget-link" href="https://www.google.com/search?q=meteo+Lille" target="_blank">Voir sur Google →</a>`; }
 }
 
 /* ══ BITCOIN — CoinGecko ══ */
@@ -441,10 +526,10 @@ async function loadBitcoin() {
     const d = await (await fetch('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd&include_24hr_change=true')).json();
     const price=d.bitcoin.usd, change=d.bitcoin.usd_24h_change, up=change>=0;
     document.getElementById('widget-btc').innerHTML = `
-      <div class="widget-label">₿ Bitcoin</div><div class="widget-icon">🟠</div>
+      <div class="widget-label">Bitcoin</div>
       <div class="widget-main">$${price.toLocaleString('fr-FR')}</div>
       <div class="widget-change ${up?'up':'down'}">${up?'▲':'▼'} ${Math.abs(change).toFixed(2)}% aujourd'hui</div>`;
-  } catch { document.getElementById('widget-btc').innerHTML = `<div class="widget-label">₿ Bitcoin</div><a class="widget-link" style="margin-top:12px" href="https://www.coingecko.com/fr/pièces/bitcoin" target="_blank">Voir sur CoinGecko →</a>`; }
+  } catch { document.getElementById('widget-btc').innerHTML = `<div class="widget-label">Bitcoin</div><a class="widget-link" style="margin-top:12px" href="https://www.coingecko.com/fr/pièces/bitcoin" target="_blank">Voir sur CoinGecko →</a>`; }
 }
 
 /* ══ FINANCE — via /api/finance (proxy Yahoo) ══ */
@@ -495,9 +580,11 @@ async function loadF1GP() {
         <div class="gp-session-time">${t?t.time:'—'}</div>
       </div>`;
     };
+    gpInfo = { name: race.raceName, iso: race.date + 'T' + (race.time || '12:00:00Z') };
+    renderHomeSummary();
     const sessHtml=sessions.map(s=>mkSession(s.label,race[s.key].date,race[s.key].time)).join('');
-    el.innerHTML=`<div class="gp-header"><div class="gp-title">🏎️ ${race.raceName}</div><div class="gp-round">Manche ${race.round} · ${race.Circuit?.circuitName||''}</div></div>
-      <div class="gp-sessions">${sessHtml}${mkSession('🏁 Course',race.date,race.time,true)}</div>`;
+    el.innerHTML=`<div class="gp-header"><div class="gp-title">${icon('flag', 16)} ${esc(race.raceName)}</div><div class="gp-round">Manche ${race.round} · ${race.Circuit?.circuitName||''}</div></div>
+      <div class="gp-sessions">${sessHtml}${mkSession('Course',race.date,race.time,true)}</div>`;
   } catch { el.innerHTML=`<div class="gp-empty">Indisponible. <a href="https://www.lequipe.fr/Formule-1/" target="_blank" style="color:var(--accent-f1)">Voir sur L'Équipe →</a></div>`; }
 }
 
@@ -517,10 +604,10 @@ function shortDate(iso, withTime){
 }
 function teamMatchHtml(m, kind){
   const comp = (m.competition||'').replace(/^UEFA\s+/,'');
-  const left = `<div class="team-match-teams" title="${esc(frDate(m.utcDate))}">${m.isHome?'🏠':'✈️'} ${esc(m.opponent)}${comp?`<span class="comp-text">${esc(comp)}</span>`:''}</div>`;
+  const left = `<div class="team-match-teams" title="${esc(frDate(m.utcDate))}">${m.isHome?icon('home',13):icon('plane',13)} ${esc(m.opponent)}${comp?`<span class="comp-text">${esc(comp)}</span>`:''}</div>`;
   let side;
   if (kind === 'live') {
-    side = `<span class="result-badge" style="background:rgba(224,74,109,.2);color:#e04a6d">🔴${m.clock?' '+esc(m.clock):''}</span><span class="score-text">${m.myScore ?? 0} – ${m.oppScore ?? 0}</span>`;
+    side = `<span class="result-badge" style="background:rgba(224,74,109,.2);color:#e04a6d"><span class="live-dot"></span>${m.clock?esc(m.clock):'direct'}</span><span class="score-text">${m.myScore ?? 0} – ${m.oppScore ?? 0}</span>`;
   } else if (kind === 'last') {
     const res = m.myScore > m.oppScore ? 'V' : m.myScore < m.oppScore ? 'D' : 'N';
     side = `<span class="comp-text">${shortDate(m.utcDate)}</span><span class="result-badge result-${res}">${res}</span><span class="score-text">${m.myScore} – ${m.oppScore}${m.shootout?' tab':''}</span>`;
@@ -537,17 +624,19 @@ async function loadTeam({teamKey,displayName,id}){
     if(data.error) throw new Error(data.error);
     const asList = v => Array.isArray(v) ? v : (v ? [v] : []);
     const last = asList(data.last), next = asList(data.next);
-    let html=`<div class="team-header"><span style="font-size:1.3rem">${teamKey==='france'?'🇫🇷':'⚽'}</span><span class="team-name">${esc(displayName)}</span></div>`;
+    let html=`<div class="team-header"><span class="team-name">${esc(displayName)}</span></div>`;
     if(data.live) html+=`<div class="team-section"><div class="team-section-label">En ce moment</div>${teamMatchHtml(data.live,'live')}</div>`;
     if(last.length) html+=`<div class="team-section"><div class="team-section-label">Derniers matchs</div>${last.map(m=>teamMatchHtml(m,'last')).join('')}</div>`;
     if(next.length) html+=`<div class="team-section"><div class="team-section-label">Prochains matchs</div>${next.map(m=>teamMatchHtml(m,'next')).join('')}</div>`;
     if(!data.live&&!last.length&&!next.length) html+=`<div class="widget-sub">Aucun match trouvé</div>`;
     el.innerHTML=html;
     el.dataset.loaded='1';
+    teamData[teamKey] = { name: displayName, live: data.live || null, next };
+    renderHomeSummary();
   }catch(e){
     // Rafraîchissement auto : on garde l'affichage précédent plutôt que de l'effacer
     if(el.dataset.loaded) { console.warn('Refresh équipe échoué:', displayName, e.message); return; }
-    el.innerHTML=`<div class="team-header"><span style="font-size:1.3rem">⚽</span><span class="team-name">${esc(displayName)}</span></div><div class="widget-sub">Données indisponibles — ${esc(e.message)}</div>`;
+    el.innerHTML=`<div class="team-header"><span class="team-name">${esc(displayName)}</span></div><div class="widget-sub">Données indisponibles — ${esc(e.message)}</div>`;
   }
 }
 
@@ -578,7 +667,7 @@ function priceSourceHtml(s) {
     ${sparkSvg(s.series)}
     <div class="price-value">${eur(l.price)}</div>
     <div class="price-meta">${merchant}${relTime(l.checked_at)}${delta}${min} ${link}</div>
-    ${l.promos ? `<div class="price-promos">🎁 ${esc(l.promos)}</div>` : ''}
+    ${l.promos ? `<div class="price-promos">${icon('gift', 13)} ${esc(l.promos)}</div>` : ''}
   </div>`;
 }
 let watchItems = [];
@@ -611,10 +700,11 @@ function renderPrices() {
   } else {
     box.innerHTML = priceProducts.map(p => {
       const alert = p.sources.some(s => s.latest.alert);
-      return `<div class="price-card${alert ? ' alert' : ''}"><div class="price-title">${alert ? '🔔' : '🏷️'} ${esc(p.label)}</div>${p.sources.map(priceSourceHtml).join('')}</div>`;
+      return `<div class="price-card${alert ? ' alert' : ''}"><div class="price-title">${icon(alert ? 'bell' : 'tag', 16)} ${esc(p.label)}</div>${p.sources.map(priceSourceHtml).join('')}</div>`;
     }).join('');
   }
   renderWatchList();
+  renderHomeSummary();
 }
 
 /* ── Liens surveillés (ajout / suppression protégés par la clé PRICE_TOKEN) ── */
@@ -694,8 +784,8 @@ Promise.allSettled([fetchReadStatus(), loadArticles()]).then(() => { renderAll()
 Promise.allSettled([
   loadWeather(),
   loadBitcoin(),
-  loadFinance('WPEA.PA',       'IE0002XZSHO1', 'widget-msci', '📈 MSCI World PEA', '€'),
-  loadFinance('ALCPB.PA',      'FR0011053636', 'widget-capb', '📊 Capital B',  '€'),
+  loadFinance('WPEA.PA',       'IE0002XZSHO1', 'widget-msci', 'MSCI World PEA', '€'),
+  loadFinance('ALCPB.PA',      'FR0011053636', 'widget-capb', 'Capital B',  '€'),
   loadF1GP(),
   loadPrices(),
   ...TEAMS.map(t=>loadTeam(t)),
