@@ -300,7 +300,7 @@ document.addEventListener('click', e => {
   else openModal(id);
 });
 
-// Glissement horizontal sur une carte d'article (téléphone)
+// Glissement sur une carte d'article (téléphone) : vers la droite = lu, vers la gauche = non lu
 (function () {
   const THRESHOLD = 80;
   let card = null, x0 = 0, y0 = 0, dx = 0, locked = null; // locked : 'h' | 'v' | null
@@ -314,17 +314,19 @@ document.addEventListener('click', e => {
     const mx = e.touches[0].clientX - x0, my = e.touches[0].clientY - y0;
     if (!locked) {
       if (Math.abs(mx) < 10 && Math.abs(my) < 10) return;
-      locked = Math.abs(mx) > Math.abs(my) && mx < 0 ? 'h' : 'v';
+      locked = Math.abs(mx) > Math.abs(my) ? 'h' : 'v';
     }
     if (locked !== 'h') return;
-    dx = Math.min(0, mx);
+    // un seul sens utile selon l'état : déjà lu → gauche seulement, non lu → droite seulement
+    const isRead = readIds.has(card.dataset.id);
+    dx = isRead ? Math.min(0, mx) : Math.max(0, mx);
     card.classList.add('swiping');
     card.style.transform = `translateX(${dx}px)`;
-    card.classList.toggle('swipe-armed', dx <= -THRESHOLD);
+    card.classList.toggle('swipe-armed', Math.abs(dx) >= THRESHOLD);
   }, { passive: true });
   const end = () => {
     if (!card) return;
-    const c = card, go = locked === 'h' && dx <= -THRESHOLD;
+    const c = card, go = locked === 'h' && Math.abs(dx) >= THRESHOLD;
     card = null;
     c.classList.remove('swiping', 'swipe-armed');
     c.style.transform = '';
@@ -370,6 +372,9 @@ function renderMarkAllBtns() {
   });
 }
 
+const isPhone = window.matchMedia('(max-width: 720px)');
+isPhone.addEventListener('change', () => renderAll());
+
 function renderAll() {
   renderList('list-fun',      ['fun']);
   renderList('list-f1',       ['f1']);
@@ -377,7 +382,7 @@ function renderAll() {
   renderList('list-foot',     ['foot']);
   renderList('list-fm',       ['fm']);
   renderList('list-fmr',      ['fm'], true);
-  renderList('list-all',      ALL_CATS, 'fm');
+  renderList('list-all',      ALL_CATS, isPhone.matches ? 'fm' : false);
   renderHomeSummary();
   renderBadges();
   renderNavBadges();

@@ -263,3 +263,4 @@ a.article-main { display: block; text-decoration: none; color: inherit; }
 .article-card { touch-action: pan-y; transition: border-color .15s, background .15s, transform .18s ease; }
 .article-card.swiping { transition: none; }
 .article-card.swipe-armed { border-color: #27ae60; background: rgba(39,174,96,.12); }
+.article-card.read.swipe-armed { border-color: var(--muted); background: var(--surface2); }
