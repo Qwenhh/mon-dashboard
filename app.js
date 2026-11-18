@@ -1,3 +1,16 @@
+/* Mon Dashboard — code du navigateur (pas de build : ce fichier est servi tel quel).
+ *
+ * Plan du fichier :
+ *   ICÔNES · ÉTAT PARTAGÉ · THÈME · DATES
+ *   LU / NON LU      localStorage + Supabase via /api/read (file d'attente si hors ligne)
+ *   ARTICLES         chargement, listes, glissement, compteurs
+ *   MODAL            lecture VDM/DTC et lecteur Footmercato (/api/article)
+ *   NAVIGATION       showTab() : onglets (ordinateur), barre du bas + filtres (téléphone)
+ *   WIDGETS          météo, Bitcoin, bourse, F1, équipes (/api/football), prix (/api/prices)
+ *   INIT             premier chargement, nettoyage des lus, service worker
+ *
+ * Tout texte venant de l'extérieur (flux, API) passe par esc() avant d'être inséré en HTML.
+ */
 /* ══ ICÔNES (pictogrammes au trait, style Feather) ══ */
 const ICONS = {
   home:    '<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>',
@@ -161,7 +174,7 @@ function openInBackground(e, link) {
   window.focus(); // remet le focus sur le dashboard
 }
 
-function toggleRead(cat, id, e) {
+function toggleRead(id, e) {
   if (e) { e.stopPropagation(); e.preventDefault(); }
   const wasRead = readIds.has(id);
   if (wasRead) readIds.delete(id); else readIds.add(id);
@@ -195,7 +208,7 @@ async function loadArticles() {
     const data = await fetch('/api/articles').then(r=>r.json());
     articles = data;
   } catch(e) {
-    ['fun','f1','biathlon','foot'].forEach(cat => {
+    ['all','fun','f1','biathlon','foot','fm','fmr'].forEach(cat => {
       const el = document.getElementById('list-'+cat);
       if (el) el.innerHTML = `<div class="error-msg">Impossible de charger les articles.<br><small>${esc(e.message)}</small></div>`;
     });
@@ -291,7 +304,7 @@ document.addEventListener('click', e => {
   const card = e.target.closest('.article-card');
   if (!card) return;
   const id = card.dataset.id;
-  if (e.target.closest('[data-action="toggle-read"]')) { toggleRead(null, id, e); return; }
+  if (e.target.closest('[data-action="toggle-read"]')) { toggleRead(id, e); return; }
   const mode = card.dataset.mode;
   if (mode === 'link') {
     const a = e.target.closest('a.article-main');
@@ -330,7 +343,7 @@ document.addEventListener('click', e => {
     card = null;
     c.classList.remove('swiping', 'swipe-armed');
     c.style.transform = '';
-    if (go) toggleRead(null, c.dataset.id);
+    if (go) toggleRead(c.dataset.id);
   };
   document.addEventListener('touchend', end);
   document.addEventListener('touchcancel', () => { if (card) { card.classList.remove('swiping', 'swipe-armed'); card.style.transform = ''; card = null; } });
@@ -391,7 +404,6 @@ function renderAll() {
 
 /* ══ MODAL ══ */
 const modalState = { id: null };
-const articleMap = {};
 
 function openModal(id) {
   const a = Object.values(articles).flat().find(x => x.id === id);
@@ -470,7 +482,7 @@ function syncModalReadBtn() {
 function modalToggleRead() {
   const a = Object.values(articles).flat().find(x => x.id === modalState.id);
   if (!a) return;
-  toggleRead(a.category, modalState.id);
+  toggleRead(modalState.id);
   syncModalReadBtn();
 }
 
@@ -631,7 +643,7 @@ async function loadF1GP() {
       {key:'SprintQualifying',label:'Qualif. Sprint'},{key:'Sprint',label:'Sprint'},
       {key:'ThirdPractice',label:'EL 3'},{key:'Qualifying',label:'Qualifications'},
     ].filter(s=>race[s.key]);
-    const mkSession=(name,date,time,isRace=false)=>{
+    const mkSession=(name,date,time)=>{
       const t=toParisTime(date,time);
       const nextUp=new Date(date+'T'+(time||'12:00:00'))>now;
       return `<div class="gp-session ${nextUp?'next-up':''}">
@@ -644,7 +656,7 @@ async function loadF1GP() {
     renderHomeSummary();
     const sessHtml=sessions.map(s=>mkSession(s.label,race[s.key].date,race[s.key].time)).join('');
     el.innerHTML=`<div class="gp-header"><div class="gp-title">${icon('flag', 16)} ${esc(race.raceName)}</div><div class="gp-round">Manche ${race.round} · ${race.Circuit?.circuitName||''}</div></div>
-      <div class="gp-sessions">${sessHtml}${mkSession('Course',race.date,race.time,true)}</div><div class="gp-standings" id="gp-standings"></div>`;
+      <div class="gp-sessions">${sessHtml}${mkSession('Course',race.date,race.time)}</div><div class="gp-standings" id="gp-standings"></div>`;
     loadF1Standings();
   } catch { el.innerHTML=`<div class="gp-empty">Indisponible. <a href="https://www.lequipe.fr/Formule-1/" target="_blank" style="color:var(--accent-f1)">Voir sur L'Équipe →</a></div>`; }
 }

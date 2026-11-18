@@ -25,7 +25,7 @@ nav::-webkit-scrollbar { display: none; }
 .tab[data-tab="fmr"].active      { border-bottom-color: var(--accent-fmr); }
 .tab-badge { background: var(--surface2); color: var(--muted); font-size: .75rem; padding: 1px 6px; border-radius: 20px; font-weight: 700; min-width: 18px; text-align: center; }
 .tab.active .tab-badge { background: rgba(255,255,255,.08); color: var(--text); }
-.btn-theme { margin-left: auto; flex-shrink: 0; background: none; border: none; font-size: 1.1rem; cursor: pointer; padding: 0 10px; align-self: center; opacity: .7; transition: opacity .15s; }
+.btn-theme { margin-left: auto; flex-shrink: 0; background: none; border: none; font-size: 1.1rem; cursor: pointer; padding: 0 10px; align-self: center; opacity: .7; transition: opacity .15s; color: var(--text); display: flex; align-items: center; }
 .btn-theme:hover { opacity: 1; }
 
 /* LIGHT MODE */
@@ -80,8 +80,7 @@ body.light .skeleton { background: linear-gradient(90deg, #e8e8f0 25%, #d8d8e8 5
 /* ÉQUIPES */
 .teams-row { display: grid; grid-template-columns: repeat(auto-fit,minmax(250px,1fr)); gap: 10px; }
 .team-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
-.team-header { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
-.team-badge { width: 28px; height: 28px; object-fit: contain; }
+.team-header { display: flex; align-items: center; flex-wrap: wrap; gap: 2px 10px; margin-bottom: 12px; }
 .team-name { font-size: .88rem; font-weight: 700; }
 .team-section { margin-bottom: 8px; }
 .team-section:last-child { margin-bottom: 0; }
@@ -124,7 +123,7 @@ body.light .skeleton { background: linear-gradient(90deg, #e8e8f0 25%, #d8d8e8 5
 .btn-refresh { background: none; border: none; color: var(--muted); font-size: .75rem; cursor: pointer; padding: 0 4px; transition: color .15s; }
 .btn-refresh:hover { color: var(--text); }
 .btn-refresh:disabled { opacity: .4; cursor: default; }
-.article-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; display: flex; align-items: flex-start; cursor: pointer; transition: border-color .15s, background .15s; overflow: hidden; text-decoration: none; color: inherit; }
+.article-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; display: flex; align-items: flex-start; cursor: pointer; transition: border-color .15s, background .15s, transform .18s ease; overflow: hidden; text-decoration: none; color: inherit; touch-action: pan-y; }
 .article-card:hover { border-color: #3e3e55; background: var(--surface2); }
 .article-card.read { opacity: .55; }
 .article-card.read:hover { opacity: .8; }
@@ -200,7 +199,6 @@ a.article-main { display: block; text-decoration: none; color: inherit; }
 .ic { flex-shrink: 0; vertical-align: -2px; }
 .live-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #e04a6d; margin-right: 5px; animation: pulse 2s infinite; }
 .tab-badge-alert { background: rgba(39,174,96,.2); color: #27ae60; }
-.btn-theme { color: var(--text); display: flex; align-items: center; }
 .gp-title, .price-title { display: flex; align-items: center; gap: 6px; }
 .team-match-teams .ic { opacity: .6; margin-right: 2px; }
 
@@ -222,7 +220,7 @@ a.article-main { display: block; text-decoration: none; color: inherit; }
 .filter-chip span { font-size: .75rem; font-weight: 700; }
 .filter-chip.active { background: rgba(123,108,246,.16); border-color: rgba(123,108,246,.45); color: var(--text); }
 
-.bnav { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 58px; background: none; border: none; color: var(--muted); font-size: .75rem; font-weight: 600; cursor: pointer; }
+.bnav { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; min-height: 58px; background: none; border: none; color: var(--muted); font-size: .75rem; font-weight: 600; cursor: pointer; }
 .bnav.active { color: var(--accent-home); }
 
 @media (max-width: 720px) {
@@ -247,20 +245,17 @@ a.article-main { display: block; text-decoration: none; color: inherit; }
 }
 
 /* CLASSEMENTS, PROCHAINS MATCHS */
-.team-header { flex-wrap: wrap; row-gap: 2px; }
 .team-rank { margin-left: auto; font-size: .75rem; color: var(--muted); white-space: nowrap; }
 #widget-upcoming .team-match:first-child { border-top: none; }
 .gp-standings:not(:empty) { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
 .gp-pos { display: inline-block; min-width: 1.2em; color: var(--muted); font-weight: 700; }
 
 /* PASTILLES DE LA BARRE DU BAS */
-.bnav { position: relative; }
 .bnav-badge { position: absolute; top: 6px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent-home); color: #fff; font-size: .68rem; font-weight: 700; line-height: 18px; text-align: center; }
 .bnav-dot { min-width: 10px; width: 10px; height: 10px; padding: 0; top: 8px; left: calc(50% + 8px); background: #27ae60; }
 .bnav-badge[hidden] { display: none; }
 
 /* GLISSER POUR MARQUER LU */
-.article-card { touch-action: pan-y; transition: border-color .15s, background .15s, transform .18s ease; }
 .article-card.swiping { transition: none; }
 .article-card.swipe-armed { border-color: #27ae60; background: rgba(39,174,96,.12); }
 .article-card.read.swipe-armed { border-color: var(--muted); background: var(--surface2); }
