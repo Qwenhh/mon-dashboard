@@ -21,6 +21,7 @@
 <nav>
   <div class="nav-logo">Dashboard</div>
   <button class="tab active" data-tab="home">Accueil</button>
+  <button class="tab" data-tab="all">Tous <span class="tab-badge" id="tbadge-all">…</span></button>
   <button class="tab" data-tab="fun">Autres <span class="tab-badge" id="tbadge-fun">…</span></button>
   <button class="tab" data-tab="f1">F1 <span class="tab-badge" id="tbadge-f1">…</span></button>
   <button class="tab" data-tab="biathlon">Biathlon <span class="tab-badge" id="tbadge-biathlon">…</span></button>
@@ -62,6 +63,9 @@
     </div>
 
     <div class="home-sec sec-scores">
+      <div class="section-divider">Prochains matchs</div>
+      <div class="team-card" id="widget-upcoming"><div class="widget-sub">Chargement…</div></div>
+
       <div class="section-divider">Prochain GP · Formule 1</div>
       <div class="gp-card" id="widget-gp"><div class="gp-empty">Chargement…</div></div>
 
@@ -166,9 +170,9 @@
 <!-- Barre du bas (téléphone uniquement) -->
 <div class="bottom-nav" role="navigation" aria-label="Navigation principale">
   <button class="bnav active" data-view="home"><i data-icon="home" data-size="22"></i>Accueil</button>
-  <button class="bnav" data-view="articles"><i data-icon="news" data-size="22"></i>Articles</button>
+  <button class="bnav" data-view="articles"><i data-icon="news" data-size="22"></i>Articles<span class="bnav-badge" id="bnav-badge-articles" hidden></span></button>
   <button class="bnav" data-view="scores"><i data-icon="award" data-size="22"></i>Scores</button>
-  <button class="bnav" data-view="prices"><i data-icon="tag" data-size="22"></i>Prix</button>
+  <button class="bnav" data-view="prices"><i data-icon="tag" data-size="22"></i>Prix<span class="bnav-badge bnav-dot" id="bnav-dot-prices" hidden></span></button>
 </div>
 
 <!-- MODAL -->

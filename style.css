@@ -245,3 +245,21 @@ a.article-main { display: block; text-decoration: none; color: inherit; }
   body[data-mview="articles"] .article-filters { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding: 10px 16px; position: sticky; top: 48px; z-index: 90; background: var(--bg); border-bottom: 1px solid var(--border); }
   .article-filters::-webkit-scrollbar { display: none; }
 }
+
+/* CLASSEMENTS, PROCHAINS MATCHS */
+.team-header { flex-wrap: wrap; row-gap: 2px; }
+.team-rank { margin-left: auto; font-size: .75rem; color: var(--muted); white-space: nowrap; }
+#widget-upcoming .team-match:first-child { border-top: none; }
+.gp-standings:not(:empty) { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+.gp-pos { display: inline-block; min-width: 1.2em; color: var(--muted); font-weight: 700; }
+
+/* PASTILLES DE LA BARRE DU BAS */
+.bnav { position: relative; }
+.bnav-badge { position: absolute; top: 6px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--accent-home); color: #fff; font-size: .68rem; font-weight: 700; line-height: 18px; text-align: center; }
+.bnav-dot { min-width: 10px; width: 10px; height: 10px; padding: 0; top: 8px; left: calc(50% + 8px); background: #27ae60; }
+.bnav-badge[hidden] { display: none; }
+
+/* GLISSER POUR MARQUER LU */
+.article-card { touch-action: pan-y; transition: border-color .15s, background .15s, transform .18s ease; }
+.article-card.swiping { transition: none; }
+.article-card.swipe-armed { border-color: #27ae60; background: rgba(39,174,96,.12); }

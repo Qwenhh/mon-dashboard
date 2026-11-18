@@ -300,6 +300,40 @@ document.addEventListener('click', e => {
   else openModal(id);
 });
 
+// Glissement horizontal sur une carte d'article (téléphone)
+(function () {
+  const THRESHOLD = 80;
+  let card = null, x0 = 0, y0 = 0, dx = 0, locked = null; // locked : 'h' | 'v' | null
+  document.addEventListener('touchstart', e => {
+    card = e.target.closest('.article-card');
+    if (!card || e.touches.length !== 1) { card = null; return; }
+    x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; dx = 0; locked = null;
+  }, { passive: true });
+  document.addEventListener('touchmove', e => {
+    if (!card) return;
+    const mx = e.touches[0].clientX - x0, my = e.touches[0].clientY - y0;
+    if (!locked) {
+      if (Math.abs(mx) < 10 && Math.abs(my) < 10) return;
+      locked = Math.abs(mx) > Math.abs(my) && mx < 0 ? 'h' : 'v';
+    }
+    if (locked !== 'h') return;
+    dx = Math.min(0, mx);
+    card.classList.add('swiping');
+    card.style.transform = `translateX(${dx}px)`;
+    card.classList.toggle('swipe-armed', dx <= -THRESHOLD);
+  }, { passive: true });
+  const end = () => {
+    if (!card) return;
+    const c = card, go = locked === 'h' && dx <= -THRESHOLD;
+    card = null;
+    c.classList.remove('swiping', 'swipe-armed');
+    c.style.transform = '';
+    if (go) toggleRead(null, c.dataset.id);
+  };
+  document.addEventListener('touchend', end);
+  document.addEventListener('touchcancel', () => { if (card) { card.classList.remove('swiping', 'swipe-armed'); card.style.transform = ''; card = null; } });
+})();
+
 function unreadCount(cats) {
   return cats.flatMap(c => articles[c]||[]).filter(a => !readIds.has(a.id)).length;
 }
@@ -315,6 +349,14 @@ function renderBadges() {
     const fb = document.getElementById('fbadge-'+k);
     if (fb) fb.textContent = n;
   });
+}
+
+function renderNavBadges() {
+  const b = document.getElementById('bnav-badge-articles');
+  if (!b) return;
+  const n = unreadCount(ALL_CATS);
+  b.hidden = n === 0;
+  b.textContent = n > 99 ? '99+' : n;
 }
 
 function renderMarkAllBtns() {
@@ -338,6 +380,7 @@ function renderAll() {
   renderList('list-all',      ALL_CATS, 'fm');
   renderHomeSummary();
   renderBadges();
+  renderNavBadges();
   renderMarkAllBtns();
 }
 
@@ -558,6 +601,18 @@ function toParisTime(d,t) {
   const dt=new Date(d+'T'+t);
   return { date:dt.toLocaleDateString('fr-FR',{weekday:'short',day:'numeric',month:'short',timeZone:'Europe/Paris'}), time:dt.toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',timeZone:'Europe/Paris'}) };
 }
+async function loadF1Standings() {
+  const el = document.getElementById('gp-standings');
+  if (!el) return;
+  try {
+    const d = await (await fetch('https://api.jolpi.ca/ergast/f1/current/driverStandings.json', { signal: AbortSignal.timeout(6000) })).json();
+    const list = d.MRData.StandingsTable.StandingsLists[0];
+    const top = (list?.DriverStandings || []).slice(0, 5);
+    if (!top.length) return;
+    el.innerHTML = `<div class="team-section-label">Classement pilotes · après ${esc(list.round)} manches</div>` +
+      top.map(x => `<div class="team-match"><div class="team-match-teams"><span class="gp-pos">${esc(x.position)}</span> ${esc(x.Driver.familyName)}<span class="comp-text">${esc(x.Constructors?.[0]?.name || '')}</span></div><div class="team-match-side"><span class="score-text">${esc(x.points)} pts</span></div></div>`).join('');
+  } catch (e) { console.warn('Classement F1 indisponible:', e.message); }
+}
 async function loadF1GP() {
   const el=document.getElementById('widget-gp');
   try {
@@ -584,7 +639,8 @@ async function loadF1GP() {
     renderHomeSummary();
     const sessHtml=sessions.map(s=>mkSession(s.label,race[s.key].date,race[s.key].time)).join('');
     el.innerHTML=`<div class="gp-header"><div class="gp-title">${icon('flag', 16)} ${esc(race.raceName)}</div><div class="gp-round">Manche ${race.round} · ${race.Circuit?.circuitName||''}</div></div>
-      <div class="gp-sessions">${sessHtml}${mkSession('Course',race.date,race.time,true)}</div>`;
+      <div class="gp-sessions">${sessHtml}${mkSession('Course',race.date,race.time,true)}</div><div class="gp-standings" id="gp-standings"></div>`;
+    loadF1Standings();
   } catch { el.innerHTML=`<div class="gp-empty">Indisponible. <a href="https://www.lequipe.fr/Formule-1/" target="_blank" style="color:var(--accent-f1)">Voir sur L'Équipe →</a></div>`; }
 }
 
@@ -616,6 +672,24 @@ function teamMatchHtml(m, kind){
   }
   return `<div class="team-match">${left}<div class="team-match-side">${side}</div></div>`;
 }
+const shortTeam = n => n.replace(/^(AS|FC|Stade de|Équipe de)\s+/, '');
+function renderUpcoming() {
+  const el = document.getElementById('widget-upcoming');
+  if (!el) return;
+  const fixture = (t, m) => m.isHome ? `${esc(shortTeam(t.name))} – ${esc(m.opponent)}` : `${esc(m.opponent)} – ${esc(shortTeam(t.name))}`;
+  const comp = m => { const c = (m.competition || '').replace(/^UEFA\s+/, ''); return c ? `<span class="comp-text">${esc(c)}</span>` : ''; };
+  const teams = Object.values(teamData);
+  const live = teams.filter(t => t.live).map(t => {
+    const m = t.live, my = m.myScore ?? 0, op = m.oppScore ?? 0;
+    return `<div class="team-match"><div class="team-match-teams">${fixture(t, m)}${comp(m)}</div><div class="team-match-side"><span class="live-dot"></span><span class="score-text">${m.isHome ? `${my} – ${op}` : `${op} – ${my}`}</span></div></div>`;
+  });
+  const next = teams.flatMap(t => (t.upcoming || []).map(m => ({ t, m })))
+    .sort((a, b) => new Date(a.m.utcDate) - new Date(b.m.utcDate))
+    .slice(0, 4)
+    .map(({ t, m }) => `<div class="team-match"><div class="team-match-teams">${fixture(t, m)}${comp(m)}</div><div class="team-match-side"><span class="score-text">${frDate(m.utcDate)}</span></div></div>`);
+  const rows = [...live, ...next];
+  el.innerHTML = rows.length ? rows.join('') : '<div class="widget-sub">Aucun match à venir.</div>';
+}
 async function loadTeam({teamKey,displayName,id}){
   const el=document.getElementById(id);
   try{
@@ -624,15 +698,19 @@ async function loadTeam({teamKey,displayName,id}){
     if(data.error) throw new Error(data.error);
     const asList = v => Array.isArray(v) ? v : (v ? [v] : []);
     const last = asList(data.last), next = asList(data.next);
-    let html=`<div class="team-header"><span class="team-name">${esc(displayName)}</span></div>`;
+    const st = data.standing;
+    const rank = st && st.rank ? `<span class="team-rank">${st.rank}${st.rank === 1 ? 'er' : 'e'} · ${esc(st.league || '')}${st.points != null ? ` · ${st.points} pts` : ''}</span>` : '';
+    let html=`<div class="team-header"><span class="team-name">${esc(displayName)}</span>${rank}</div>`;
     if(data.live) html+=`<div class="team-section"><div class="team-section-label">En ce moment</div>${teamMatchHtml(data.live,'live')}</div>`;
     if(last.length) html+=`<div class="team-section"><div class="team-section-label">Derniers matchs</div>${last.map(m=>teamMatchHtml(m,'last')).join('')}</div>`;
     if(next.length) html+=`<div class="team-section"><div class="team-section-label">Prochains matchs</div>${next.map(m=>teamMatchHtml(m,'next')).join('')}</div>`;
     if(!data.live&&!last.length&&!next.length) html+=`<div class="widget-sub">Aucun match trouvé</div>`;
     el.innerHTML=html;
     el.dataset.loaded='1';
-    teamData[teamKey] = { name: displayName, live: data.live || null, next };
+    const upcoming = asList(data.upcoming);
+    teamData[teamKey] = { name: displayName, live: data.live || null, next, upcoming: upcoming.length ? upcoming : next };
     renderHomeSummary();
+    renderUpcoming();
   }catch(e){
     // Rafraîchissement auto : on garde l'affichage précédent plutôt que de l'effacer
     if(el.dataset.loaded) { console.warn('Refresh équipe échoué:', displayName, e.message); return; }
@@ -686,7 +764,10 @@ async function loadPrices() {
     priceProducts = (pr.products || []).filter(p => p.sources.length);
     watchItems = wl.items || [];
     renderPrices();
-    if (badge) badge.hidden = !priceProducts.some(p => p.sources.some(s => s.latest.alert));
+    const hasAlert = priceProducts.some(p => p.sources.some(s => s.latest.alert));
+    if (badge) badge.hidden = !hasAlert;
+    const dot = document.getElementById('bnav-dot-prices');
+    if (dot) dot.hidden = !hasAlert;
   } catch (e) {
     console.warn('Veille prix indisponible:', e.message);
     if (!box.querySelector('.price-card')) box.innerHTML = `<div class="error-msg">Veille prix indisponible : ${esc(e.message)}</div>`;

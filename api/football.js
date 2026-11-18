@@ -2,10 +2,10 @@
 // Source principale : ESPN (gratuit, sans clé) — couvre championnat, coupes d'Europe, sélections
 // Secours : football-data.org (clé FOOTBALL_DATA_KEY) — championnat + Ligue des champions seulement
 const TEAMS = {
-  monaco: { espn: 174, fd: 548 },
-  barce:  { espn: 83,  fd: 81  },
+  monaco: { espn: 174, fd: 548, league: 'fra.1', leagueName: 'Ligue 1' },
+  barce:  { espn: 83,  fd: 81,  league: 'esp.1', leagueName: 'LaLiga' },
   france: { espn: 478, fd: 773 },
-  reims:  { espn: 3243, fd: null }, // Ligue 2 — pas de secours football-data
+  reims:  { espn: 3243, fd: null, league: 'fra.2', leagueName: 'Ligue 2' }, // Ligue 2 — pas de secours football-data
 };
 const HOW_MANY = 2; // nombre de derniers résultats / prochains matchs affichés
 
@@ -17,7 +17,7 @@ const FR_NAMES = {
   Poland: 'Pologne', Austria: 'Autriche', Scotland: 'Écosse', Wales: 'Pays de Galles',
   Brazil: 'Brésil', Morocco: 'Maroc', Senegal: 'Sénégal', 'Ivory Coast': "Côte d'Ivoire",
 };
-const frName = (n) => FR_NAMES[n] || n;
+const frName = (n) => (/^TBD\b/i.test(n) ? 'À déterminer' : FR_NAMES[n] || n);
 
 function cleanCompetition(name = '') {
   return name
@@ -51,10 +51,30 @@ function mapEspnEvent(e, teamId) {
   };
 }
 
-async function fromEspn(teamId) {
+// Classement : championnat pour les clubs, résumé ESPN pour les sélections. Jamais bloquant.
+async function espnStanding(cfg) {
+  if (!cfg.league) return null;
+  const r = await fetch(`https://site.api.espn.com/apis/v2/sports/soccer/${cfg.league}/standings`,
+    { signal: AbortSignal.timeout(6000), headers: { 'User-Agent': 'Mozilla/5.0' } });
+  if (!r.ok) return null;
+  const d = await r.json();
+  const entries = d.children?.[0]?.standings?.entries || d.standings?.entries || [];
+  const e = entries.find((x) => String(x.team?.id) === String(cfg.espn));
+  if (!e) return null;
+  const stat = (n) => { const v = e.stats?.find((x) => x.name === n)?.value; return v === undefined ? null : Number(v); };
+  return { rank: stat('rank'), points: stat('points'), played: stat('gamesPlayed'), league: cfg.leagueName };
+}
+// "1st in UEFA Nations League" → { rank: 1, league: 'Nations League' }
+function parseStandingSummary(txt) {
+  const m = /^(\d+)\w*\s+in\s+(.+)$/i.exec(txt || '');
+  return m ? { rank: Number(m[1]), points: null, played: null, league: cleanCompetition(m[2]).replace(/^UEFA\s+/, '') } : null;
+}
+
+async function fromEspn(cfg) {
+  const teamId = cfg.espn;
   const base = `https://site.api.espn.com/apis/site/v2/sports/soccer/all/teams/${teamId}/schedule`;
   const opts = { signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'Mozilla/5.0' } };
-  const [pastRes, nextRes] = await Promise.all([fetch(base, opts), fetch(base + '?fixture=true', opts)]);
+  const [pastRes, nextRes, standing] = await Promise.all([fetch(base, opts), fetch(base + '?fixture=true', opts), espnStanding(cfg).catch(() => null)]);
   if (!pastRes.ok || !nextRes.ok) throw new Error(`ESPN HTTP ${pastRes.status}/${nextRes.status}`);
   const [past, next] = await Promise.all([pastRes.json(), nextRes.json()]);
 
@@ -68,6 +88,8 @@ async function fromEspn(teamId) {
     live,
     last: done.slice(-HOW_MANY).reverse(),                                   // le plus récent d'abord
     next: upcoming.filter((m) => m.state === 'pre').slice(0, HOW_MANY),
+    upcoming: upcoming.filter((m) => m.state === 'pre').slice(0, 4), // pour la carte "Prochains matchs"
+    standing: standing || parseStandingSummary(past.team?.standingSummary || next.team?.standingSummary),
   };
 }
 
@@ -101,6 +123,8 @@ async function fromFootballData(fdId) {
     live: null,
     last: (lastData.matches || []).slice(-HOW_MANY).reverse().map(map),
     next: (nextData.matches || []).slice(0, HOW_MANY).map(map),
+    upcoming: (nextData.matches || []).slice(0, HOW_MANY).map(map),
+    standing: null,
   };
 }
 
@@ -111,7 +135,7 @@ module.exports = async function handler(req, res) {
   if (!cfg) return res.status(400).json({ error: `Équipe inconnue: ${req.query.team}` });
 
   try {
-    const data = await fromEspn(cfg.espn);
+    const data = await fromEspn(cfg);
     return res.status(200).json({ source: 'espn', ...data });
   } catch (e) {
     console.warn('ESPN indisponible, bascule sur football-data:', e.message);
